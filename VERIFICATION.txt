@@ -1,0 +1,11 @@
+Release validation: 0.2.26
+
+Production build: zero warnings and zero errors.
+Regression checks: 420 main, 46 collision, 67 completion, 28 mesh lifetime, and 19 source lifetime; 580 passed.
+Compiled defaults: all 73 F8 values and 20 pregnancy F1 defaults match the accepted baseline.
+The main test project retains its existing CS0649 helper-field warning. Deliberately injected cache failures are part of recovery tests.
+Source review: only release naming, controller identifiers, diagnostic paths, version metadata, English descriptions, and publishing documentation changed.
+All default preset values, configuration keys, save formats, and gameplay/physics/shape calculations are preserved.
+Repository filenames and text were scanned for untranslated Chinese content.
+Manual shape-preview terms and legacy configuration identifiers remain intentional.
+No new in-game visual or performance claim is made for this naming-only release.

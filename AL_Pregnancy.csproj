@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>AL_Pregnancy</AssemblyName>
+    <Version>0.2.26</Version>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <NuGetAudit>false</NuGetAudit>
+    <GameDir Condition="'$(GameDir)' == ''">$(AL_GAME_DIR)</GameDir>
+    <InteropDir Condition="'$(InteropDir)' == '' and Exists('$(GameDir)\BepInEx\interop-AmanatsuLocation\interop\Assembly-CSharp.dll')">$(GameDir)\BepInEx\interop-AmanatsuLocation\interop</InteropDir>
+    <InteropDir Condition="'$(InteropDir)' == ''">$(GameDir)\BepInEx\interop</InteropDir>
+    <CoreDir Condition="'$(CoreDir)' == ''">$(GameDir)\BepInEx\core</CoreDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="CollisionSurfaceMap.cs" />
+    <Reference Include="$(InteropDir)\*.dll"><Private>false</Private></Reference>
+    <Reference Include="$(CoreDir)\BepInEx.Core.dll"><Private>false</Private></Reference>
+    <Reference Include="$(CoreDir)\BepInEx.Unity.Common.dll"><Private>false</Private></Reference>
+    <Reference Include="$(CoreDir)\BepInEx.Unity.IL2CPP.dll"><Private>false</Private></Reference>
+    <Reference Include="$(CoreDir)\Il2CppInterop.Runtime.dll"><Private>false</Private></Reference>
+    <Reference Include="$(CoreDir)\Il2CppInterop.Common.dll"><Private>false</Private></Reference>
+    <Reference Include="$(CoreDir)\0Harmony.dll"><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="ValidateGame" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(InteropDir)\Assembly-CSharp.dll')" Text="Set GameDir or InteropDir to AmanatsuLocation's active interop directory." />
+  </Target>
+</Project>
+
+
+
+
+
+

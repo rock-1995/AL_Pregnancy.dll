@@ -1,0 +1,17 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+*.suo
+*.dll
+*.pdb
+*.zip
+artifacts/
+diagnostics/
+verification/
+*.sav
+*.sav.*
+*.alpregnancy.json*
+local.al.pregnancy.preview.cfg
+ALPregnancy_initial_cycles.json
