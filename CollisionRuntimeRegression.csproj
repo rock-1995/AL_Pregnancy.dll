@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../src/BodyCollisionRuntime.cs" Link="BodyCollisionRuntime.cs" />
+    <Compile Include="../src/CollisionDeformation.cs" Link="CollisionDeformation.cs" />
+    <Compile Include="../src/BellyShape.cs" Link="BellyShape.cs" />
+    <Compile Include="../src/VirtualAxisMath.cs" Link="VirtualAxisMath.cs" />
+    <Compile Include="../src/TorsoProfile.cs" Link="TorsoProfile.cs" />
+    <Compile Include="../src/UpperFoldSupport.cs" Link="UpperFoldSupport.cs" />
+    <Compile Include="../src/RestSpaceMapping.cs" Link="RestSpaceMapping.cs" />
+    <Compile Include="../src/RigBoneNames.cs" Link="RigBoneNames.cs" />
+    <Compile Include="../src/RestPoseFit.cs" Link="RestPoseFit.cs" />
+    <Compile Include="../src/BreastExclusion.cs" Link="BreastExclusion.cs" />
+    <Compile Include="../src/VtxSettings.cs" Link="VtxSettings.cs" />
+  </ItemGroup>
+</Project>

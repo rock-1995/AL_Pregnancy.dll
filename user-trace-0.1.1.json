@@ -1,0 +1,162 @@
+[
+  {
+    "Renderer": "o_body",
+    "Mesh": "o_body_armleg",
+    "Active": true,
+    "Readable": true,
+    "Vertices": 5848,
+    "Waist": 22,
+    "Spine": -1,
+    "Abdomen": 0
+  },
+  {
+    "Renderer": "o_body_shadow",
+    "Mesh": "o_body_shadow",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 288,
+    "Waist": -1,
+    "Spine": -1,
+    "Abdomen": 0
+  },
+  {
+    "Renderer": "o_lower_type01",
+    "Mesh": "o_lower_type01",
+    "Active": true,
+    "Readable": true,
+    "Vertices": 3795,
+    "Waist": 15,
+    "Spine": 18,
+    "Abdomen": 2028
+  },
+  {
+    "Renderer": "o_lower_type02",
+    "Mesh": "o_lower_type02",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 3649,
+    "Waist": 15,
+    "Spine": 18,
+    "Abdomen": 1938
+  },
+  {
+    "Renderer": "o_lower_type03",
+    "Mesh": "o_lower_type03",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 3326,
+    "Waist": 15,
+    "Spine": 18,
+    "Abdomen": 1611
+  },
+  {
+    "Renderer": "o_lower_type04",
+    "Mesh": "o_lower_type04",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 3705,
+    "Waist": 15,
+    "Spine": 18,
+    "Abdomen": 1948
+  },
+  {
+    "Renderer": "o_lower_type05",
+    "Mesh": "o_lower_type05",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 3599,
+    "Waist": 15,
+    "Spine": 18,
+    "Abdomen": 1890
+  },
+  {
+    "Renderer": "o_onepi_type01",
+    "Mesh": "o_onepi_type01",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 6330,
+    "Waist": 31,
+    "Spine": 104,
+    "Abdomen": 2950
+  },
+  {
+    "Renderer": "o_onepi_type02",
+    "Mesh": "o_onepi_type02",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 6416,
+    "Waist": 31,
+    "Spine": 104,
+    "Abdomen": 2918
+  },
+  {
+    "Renderer": "o_onepi_type03",
+    "Mesh": "o_onepi_type03",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 6326,
+    "Waist": 31,
+    "Spine": 104,
+    "Abdomen": 2786
+  },
+  {
+    "Renderer": "o_onepi_type04",
+    "Mesh": "o_onepi_type04",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 6714,
+    "Waist": 31,
+    "Spine": 104,
+    "Abdomen": 3204
+  },
+  {
+    "Renderer": "o_upper_type01",
+    "Mesh": "o_upper_type01",
+    "Active": true,
+    "Readable": true,
+    "Vertices": 3372,
+    "Waist": 22,
+    "Spine": 95,
+    "Abdomen": 1498
+  },
+  {
+    "Renderer": "o_upper_type02",
+    "Mesh": "o_upper_type02",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 3106,
+    "Waist": 22,
+    "Spine": 95,
+    "Abdomen": 1259
+  },
+  {
+    "Renderer": "o_upper_type03",
+    "Mesh": "o_upper_type03",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 4693,
+    "Waist": 22,
+    "Spine": 95,
+    "Abdomen": 1983
+  },
+  {
+    "Renderer": "o_upper_type04",
+    "Mesh": "o_upper_type04",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 3955,
+    "Waist": 22,
+    "Spine": 95,
+    "Abdomen": 1522
+  },
+  {
+    "Renderer": "o_upper_type05",
+    "Mesh": "o_upper_type05",
+    "Active": false,
+    "Readable": true,
+    "Vertices": 3604,
+    "Waist": 22,
+    "Spine": 95,
+    "Abdomen": 1577
+  }
+]
