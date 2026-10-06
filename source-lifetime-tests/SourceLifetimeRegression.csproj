@@ -2,4 +2,5 @@
 <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><NuGetAudit>false</NuGetAudit>
 <LeaseSource Condition="'$(LeaseSource)' == ''">../src/MeshLease.cs</LeaseSource></PropertyGroup>
 <ItemGroup><Compile Include="$(LeaseSource)" Link="MeshLease.cs"/><Compile Include="../src/FluidMeshLifetime.cs" Link="FluidMeshLifetime.cs"/></ItemGroup>
+<ItemGroup><Compile Include="../src/SupplementalClothing.cs" Link="SupplementalClothing.cs"/></ItemGroup>
 </Project>

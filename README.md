@@ -1,14 +1,18 @@
 # AL Pregnancy
 
-Version **0.2.26**. A BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
+Version **0.2.27**. A BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
 
 Provides pregnancy progression, belly and clothing deformation, F1 global settings, an F8 character panel with manual shape preview, and synchronization with the game's existing fluid collision meshes.
 
-## Changes in 0.2.26
+## Changes in 0.2.27
 
-This is a naming and English-language packaging update to 0.2.25. The plugin assembly is now `AL_Pregnancy.dll`, the installation directory is `AL_Pregnancy`, and the panel controller is named `PregnancyController`. Configuration descriptions and repository documentation are in English.
+AL's additional clothing slots (`add_etc`, `add_arm`, `add_leg` and their compact name variants) now enter the existing clothing deformation and pose-response pipeline. This fixes the heart waist chain `o_add_etc00_waist00` from the reported coordinate card and covers similarly named belts and additional garments.
 
-Gameplay, physics, shape calculations, defaults, save formats, and configuration keys are unchanged. No body-to-body collision feature has been added.
+Some of these native assets disable CPU Read/Write. When acquiring their private meshes, the plugin can reconstruct a readable copy from the original mesh's GPU vertex/index buffers. The copy preserves all vertex streams, skin bind poses/weights, submeshes, UVs and bounds. Only supplemental clothing uses this fallback. The shared original is restored through the existing lease and fluid-lifetime handling. A failed readback or an unsupported unreadable blend-shape mesh stays on its original mesh and emits a `[Clothing] Cannot read` warning.
+
+Belly shape, growth, saved settings, defaults and the free-accessory exclusions are unchanged. No additional F1/F8 controls are needed.
+
+GPU copying occurs once per mesh lease, not every frame, but may briefly synchronize the GPU when changing outfits. The reporter confirmed the waist-chain fix works in game with the supplied coordinate. Broader pose coverage and outfit-switching performance have not been measured; see `VERIFICATION.txt` for the scope of validation.
 
 ## Features and defaults
 
@@ -57,15 +61,18 @@ The stable internal plugin ID remains `local.al.pregnancy.preview` for compatibi
 ./Test.ps1 -GameDir 'D:\Games\AmanatsuLocation'
 ```
 
-Runs the main regression suite, collision cache tests, native completion tests, fluid mesh lifetime tests, and shared-source lifetime tests. The main suite requires the local `BepInEx.Core.dll`; the other suites use source code and test doubles. Offline tests do not replace in-game visual, native physics, or performance checks.
+Runs the main regression suite, collision cache tests, native completion tests, fluid mesh lifetime tests, shared-source lifetime tests, and clothing buffer-copy tests. The main suite requires the local `BepInEx.Core.dll`; the other suites use source code and test doubles. Offline tests do not replace in-game visual, native physics, or performance checks.
 
 `tests/user-trace-*.json` contains lightweight mesh-selection and bone-name regression data. Full character geometry captures, game saves, and local configuration are excluded. Optional collision replay requires a separately supplied matching 0.2.19 capture; the default test command does not depend on it.
+
+The buffer-copy implementation uses Unity's [original mesh vertex buffers](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Mesh.GetVertexBuffer.html), not posed renderer output.
 
 ## Repository layout
 
 - `src/`: plugin runtime source.
 - `presets/`: accepted F8 defaults.
 - `tests/`: shape, progression, storage, selection, and configuration regressions.
+- `clothing-runtime-tests/`: mesh copy success/failure tests using API doubles.
 - `collision-runtime-tests/`: collision cache and Obi index tests, plus optional capture replay.
 - `readiness-tests/`, `lifetime-tests/`, `source-lifetime-tests/`: readiness and resource ownership regressions.
 

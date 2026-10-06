@@ -62,6 +62,23 @@ headHuman.GameObject.Renderers=heads;var originals=heads.Select(r=>r.sharedMesh)
 Check("Eye tear and canine meshes stay under native ownership",headLease.ReadableCount==0 && heads.Select((r,i)=>r.sharedMesh==originals[i]).All(v=>v));
 headLease.Dispose();
 Check("Source lifecycle never uses the unsafe Surface setter",SurfaceList.GenericWrites==0);
+
+var chainSource=new Mesh {name="o_add_etc00_waist00",isReadable=false};
+var chain=Lease(chainSource);var chainClone=chain.Item2.sharedMesh;
+Check("Unreadable supplemental clothing acquires a private readable copy", chainClone!=chainSource && chainClone.isReadable && MeshLease.Owns(chainClone));
+Check("Readback clone resolves its original for readiness",MeshLease.OriginalForReadiness(chainClone)==chainSource);
+Resources.UnloadUnusedAssets();
+Check("Unreadable shared source remains protected during deformation",chainSource!=null);
+chain.Item3.Dispose();
+Check("Unreadable chain restores its exact source and retires the readable clone",chain.Item2.sharedMesh==chainSource && chainClone.Destroyed);
+ReadableClothingMesh.Fail=true;
+var failedSource=new Mesh {name="o_add_etc00_waist00",isReadable=false};var failed=Lease(failedSource);
+Check("GPU failure leaves the original visible and unowned",failed.Item2.sharedMesh==failedSource && !MeshLease.Owns(failedSource) && failed.Item3.UnreadableCount==1);
+failed.Item3.Dispose();ReadableClothingMesh.Fail=false;
+int copies=ReadableClothingMesh.Calls;
+var outside=Lease(new Mesh {name="unknown_unreadable",isReadable=false});
+Check("GPU fallback is limited to supplemental clothing",ReadableClothingMesh.Calls==copies && outside.Item3.ReadableCount==0);
+outside.Item3.Dispose();
 Console.WriteLine($"{checks} source lifetime checks passed (native-root model; not a Unity runtime test).");
 
 namespace UnityEngine

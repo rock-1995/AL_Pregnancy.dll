@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.27
+
+- Include AL supplemental clothes in the existing deformation pipeline, including the reported heart waist chain.
+- Add a readable private GPU-buffer copy for unreadable supplemental clothes, retaining original mesh restoration and ownership.
+- Reject incomplete copies and unreadable blend shapes without replacing the visible source.
+- Add selection, buffer integrity/failure, source-lifetime regressions and an optional local asset replay.
+- The reporter confirmed the supplied waist-chain coordinate works in game.
+- Preserve belly shape, growth logic, settings, presets, collision behavior and free-accessory exclusions.
+
 ## 0.2.26
 
 - Rename the plugin assembly and installation directory to `AL_Pregnancy`.

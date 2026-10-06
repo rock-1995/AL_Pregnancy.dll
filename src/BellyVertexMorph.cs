@@ -1499,7 +1499,8 @@ namespace ALPregnancy
                        id.Contains("bikini") || id.Contains("leotard") || id.Contains("inner") ||
                        id.Contains("underwear") ||
                        id.Contains("pants") || id.Contains("shirt") || id.Contains("camisole") ||
-                       id.Contains("fincent") || id.Contains("sailor");
+                       id.Contains("fincent") || id.Contains("sailor") ||
+                       SupplementalClothing.Matches(id);
             }
             catch { return false; }
         }

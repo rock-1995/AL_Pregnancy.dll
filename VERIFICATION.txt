@@ -1,11 +1,27 @@
-Release validation: 0.2.26
+Release validation: 0.2.27 (2026-10-06)
 
-Production build: zero warnings and zero errors.
-Regression checks: 420 main, 46 collision, 67 completion, 28 mesh lifetime, and 19 source lifetime; 580 passed.
-Compiled defaults: all 73 F8 values and 20 pregnancy F1 defaults match the accepted baseline.
-The main test project retains its existing CS0649 helper-field warning. Deliberately injected cache failures are part of recovery tests.
-Source review: only release naming, controller identifiers, diagnostic paths, version metadata, English descriptions, and publishing documentation changed.
-All default preset values, configuration keys, save formats, and gameplay/physics/shape calculations are preserved.
-Repository filenames and text were scanned for untranslated Chinese content.
-Manual shape-preview terms and legacy configuration identifiers remain intentional.
-No new in-game visual or performance claim is made for this naming-only release.
+Production Release build against E:/as active IL2CPP interop: 0 warnings, 0 errors.
+Six offline suites: 435 main + 46 collision + 67 native completion + 28 mesh lifetime + 25 source lifetime + 30 clothing buffer = 631 checks passed.
+The main suite retains the pre-existing CS0649 CollisionSurfaceMap helper-field warning.
+Deliberately injected collision/readback failures are expected recovery tests.
+
+User card: ALCoorde_F_20261003163508192.png, coordinate name Jirai night.
+Decoded Clothes.parts[10].id = 1: category 115, heart chain, prefab p_cf_add_etc00.
+Actual waist mesh: o_add_etc00_waist00, 302 vertices, 8 bones, Read/Write disabled in the native asset.
+The old clothing name filter excluded this supplemental garment. The old lease also skipped unreadable meshes.
+Free accessories were inspected but are not the reported waist chain; their exclusions remain unchanged.
+
+Local asset replay (not a rendered game test):
+- Heart waist chain: exact rest-space mapping using 2 shared bones, residual 0.00000191.
+- Stages 0 / 0.45 / 0.70 / 1.00: moved 0 / 261 / 262 / 262 of 302 vertices.
+- Leather waist belt: anatomical mapping using 6 matched bones, residual 0.00000109; 1833/3470 vertices move at full stage.
+- Mapping round trips and finite static shape results: 20 assertions passed.
+- The neck chain has no direct torso route and is not mapped in this direct replay.
+These counts exercise rest-space conversion plus the existing raw static belly deformation; they do not simulate the complete surface-attachment, pose, shader or native GPU pipeline.
+Optional replay entry point: tests --clothing-replay <local-export.json>. Local full asset geometry and character captures are not distributed.
+
+Source comparison: belly shape, F1/F8 settings/defaults, preset, progression, rest-space math, virtual skinning and collision runtime are byte-identical to 0.2.26.
+
+In-game feedback (2026-10-06): the reporter confirmed this version successfully fixes the supplied coordinate. This is user-reported validation, separate from the automated checks above. Broader pose coverage, outfit-switching performance and other supplemental garments have not been exhaustively tested in game.
+GPU copying is attempted once per lease only for recognized supplemental garments. It may briefly synchronize the GPU. Failed reads, missing weights, invalid data or unreadable blend-shape meshes leave the original renderer mesh in place and log [Clothing] Cannot read.
+Original game files, coordinate card, installed plugin and user settings were not modified by this task.

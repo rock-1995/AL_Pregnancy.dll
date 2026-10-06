@@ -34,4 +34,5 @@
     <None Include="user-trace-0.1.1.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="user-trace-0.1.3-bones.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+<ItemGroup><Compile Include="../src/SupplementalClothing.cs" Link="SupplementalClothing.cs"/></ItemGroup>
 </Project>

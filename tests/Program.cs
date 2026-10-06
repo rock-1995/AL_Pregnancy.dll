@@ -10,6 +10,8 @@ void Check(string name, bool condition)
     passed++;
 }
 
+if(args.Length>1 && args[0]=="--clothing-replay") { SupplementalClothingReplay.Run(args[1],Check);return; }
+SupplementalClothingRegression.Run(Check);
 ReleaseDefaultsRegression.Run(Check);
 StartupConfigRegression.Run(Check);
 LowerTransitionRegression.Run(Check);

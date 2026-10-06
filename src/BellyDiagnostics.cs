@@ -92,7 +92,7 @@ internal static partial class BellyVertexMorph
             object upperFold=support==null?null:new {failed=support.Failed,validColumns=support.Field.ValidColumns,activeColumns=support.Field.ActiveColumns,
                 low=support.Field.Low,high=support.Field.High,maxNormalizedCorrection=support.Field.MaxCorrection,writes=support.Writes,
                 movedVertices=support.Meshes.Sum(m=>m.Moved),singularVertices=support.Meshes.Sum(m=>m.Singular),hiddenReferences=support.Sources.Count(s=>s.ReadOnlySource)};
-            File.WriteAllText(path, JsonSerializer.Serialize(new { version = "0.2.26", deformationMode = "native-completion-material-height-no-boundary-rings", frame, anatomy = state?.Profile, virtualAxis, upperFold,
+            File.WriteAllText(path, JsonSerializer.Serialize(new { version = "0.2.27", deformationMode = "native-completion-material-height-no-boundary-rings", frame, anatomy = state?.Profile, virtualAxis, upperFold,
                 collision = CollisionSnapshot(human),
                 navelResponse=BellyShape.NavelStageResponse(state?.LastAppliedRate??0,BellyDeformSettings.Vtx), settings = BellyDeformSettings.Vtx, meshes }, options));
             Log.LogInfo("[VtxDump] Geometry snapshot written: " + path);

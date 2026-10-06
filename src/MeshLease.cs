@@ -99,13 +99,22 @@ internal sealed class MeshLease : IDisposable
                 // Read the live mesh here, but reuse the renderer selection.
                 if (renderer == null || (observations == null && !Relevant(renderer)) || renderer.sharedMesh == null) continue;
                 Mesh original = renderer.sharedMesh;
-                if (!original.isReadable)
+                Mesh clone = null;
+                if (original.isReadable) clone = UnityEngine.Object.Instantiate(original);
+                else if (SupplementalClothing.Matches(renderer.name + "/" + original.name))
+                {
+                    clone = ReadableClothingMesh.TryCreate(original, out var reason);
+                    if (clone == null)
+                        PregnancyPlugin.Logger.LogWarning($"[Clothing] Cannot read {renderer.name}: {reason}");
+                    else if (PregnancyPlugin.ConfigLog?.Value == true)
+                        PregnancyPlugin.Logger.LogInfo($"[Clothing] Readable GPU copy: {renderer.name}, vertices={original.vertexCount}");
+                }
+                if (clone == null)
                 {
                     UnreadableCount++;
                 }
                 else
                 {
-                    Mesh clone = UnityEngine.Object.Instantiate(original);
                     // Keep the name: the legacy morph uses mesh names to classify clothing.
                     clone.name = original.name;
                     clone.hideFlags = HideFlags.DontSave;
