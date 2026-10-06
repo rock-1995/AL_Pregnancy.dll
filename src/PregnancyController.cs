@@ -185,7 +185,7 @@ public sealed class PregnancyController : MonoBehaviour
             _window.height = Mathf.Min(610, Screen.height - 30);
             _window.x = Mathf.Clamp(_window.x, 0, Mathf.Max(0, Screen.width - _window.width));
             _window.y = Mathf.Clamp(_window.y, 0, Mathf.Max(0, Screen.height - _window.height));
-            _window = GUI.Window(0x414C50, _window, _draw, "AL Pregnancy 0.2.26 - F8");
+            _window = GUI.Window(0x414C50, _window, _draw, "AL Pregnancy 0.2.27 - F8");
         }
         catch (Exception ex)
         {

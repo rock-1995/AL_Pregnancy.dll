@@ -9,7 +9,7 @@ using UnityEngine;
 namespace ALPregnancy;
 
 // Preserve the legacy ID so existing configuration and plugin references remain valid.
-[BepInPlugin("local.al.pregnancy.preview", "AL Pregnancy", "0.2.26")]
+[BepInPlugin("local.al.pregnancy.preview", "AL Pregnancy", "0.2.27")]
 [BepInDependency(PatchCompatibility.UncensorGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInProcess("AmanatsuLocation.exe")]
 public sealed class PregnancyPlugin : BasePlugin
@@ -52,7 +52,7 @@ public sealed class PregnancyPlugin : BasePlugin
         PregnancyRuntime.Install(_harmony);
         MorphReadiness.Install(_harmony);
         BellyVertexMorph.InstallCollisionSync(_harmony);
-        Log.LogInfo("AL Pregnancy 0.2.26 loaded. Direct low-poly collision inputs; batch Obi mesh invalidation before world readers to preserve global mesh indices; accepted F8 defaults; original F1 defaults; configurable linear growth stages; independent daily progress variation.");
+        Log.LogInfo("AL Pregnancy 0.2.27 loaded. Direct low-poly collision inputs; batch Obi mesh invalidation before world readers to preserve global mesh indices; accepted F8 defaults; original F1 defaults; configurable linear growth stages; independent daily progress variation.");
     }
 
     internal static void TickStartupConfig() => _startupConfig?.Tick(Time.unscaledTime);

@@ -6,4 +6,5 @@
     <Compile Include="../src/MeshLease.cs" Link="MeshLease.cs" />
     <Compile Include="../src/PatchCompatibility.cs" Link="PatchCompatibility.cs" />
   </ItemGroup>
+<ItemGroup><Compile Include="../src/SupplementalClothing.cs" Link="SupplementalClothing.cs"/></ItemGroup>
 </Project>
