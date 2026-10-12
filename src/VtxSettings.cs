@@ -5,47 +5,59 @@ namespace ALPregnancy
     // ── Vertex-mode parameters ───────────────────────────────────────────
     public class VtxSettings
     {
-        // Defaults captured from the user's 2026-10-06 00:33:28 v0.2.23 diagnostic.
-        // Keep full precision so resetting reproduces the accepted settings.
+        // Defaults captured from the user on 2026-10-13 at 07:09:10 (0.2.39).
+        // Explicit values in existing presets remain authoritative.
         [JsonPropertyName("growthFullness")] public float GrowthFullness { get; set; } = 1.116265f;
-        [JsonPropertyName("growthWidth")] public float GrowthWidth { get; set; } = 1.1927711f;
-        [JsonPropertyName("upperReach")] public float UpperReach { get; set; } = 1.1990964f;
+        [JsonPropertyName("growthWidth")] public float GrowthWidth { get; set; } = 1.1f;
+        [JsonPropertyName("upperReach")] public float UpperReach { get; set; } = 1.0762501f;
         [JsonPropertyName("lateSettle")] public float LateSettle { get; set; } = 0.502008f;
-        [JsonPropertyName("verticalRange")] public float VerticalRange { get; set; } = 0.993976f;
+        [JsonPropertyName("verticalRange")] public float VerticalRange { get; set; } = 1.05375f;
         [JsonPropertyName("wallSmoothing")] public float WallSmoothing { get; set; } = 2f;
-        [JsonPropertyName("sagStrength")] public float SagStrength { get; set; } = 0.95983934f;
+        // Legacy surface slide: keep its JSON key and existing values.
+        [JsonPropertyName("sagStrength")] public float SagStrength { get; set; } = 1.0625f;
+        // Independent downward translation; 0-2 is the recommended slider range, not a value limit.
+        [JsonPropertyName("bellySag")] public float BellySag { get; set; } = 2.5f;
         [JsonPropertyName("midVolume")] public float MidVolume { get; set; } = 1.1551205f;
         [JsonPropertyName("lowerPoleLift")] public float LowerPoleLift { get; set; } = 1.0240964f;
         [JsonPropertyName("skinClearance")] public float SkinClearance { get; set; } = 0.19116466f;
+        // Shared shape and skinning protection; old presets inherit these new fields.
+        [JsonPropertyName("lowerBreastGuardWidth")] public float LowerBreastGuardWidth { get; set; } = 0.2078125f;
+        [JsonPropertyName("thighGuardSpeed")] public float ThighGuardSpeed { get; set; } = 1.225f;
+        [JsonPropertyName("innerThighGuardStrength")] public float InnerThighGuardStrength { get; set; } = 0f;
+        [JsonPropertyName("thighGuardWidth")] public float ThighGuardWidth { get; set; } = 0.2484375f;
+        [JsonPropertyName("bottomGuardStrength")] public float BottomGuardStrength { get; set; } = 0.00625f;
+        [JsonPropertyName("bottomGuardWidth")] public float BottomGuardWidth { get; set; } = 0.171875f;
+        // Curve height boundaries around the fixed full-term belly centre; 0 keeps straight bands.
+        [JsonPropertyName("heightBoundaryArc")] public float HeightBoundaryArc { get; set; } = 0.8f;
         // Pose equation: a virtual matrix palette entry, without hierarchy bones.
         [JsonPropertyName("virtualAxisStrength")] public float VirtualAxisStrength { get; set; } = 1f;
         [JsonPropertyName("axisBlendStart")] public float AxisBlendStart { get; set; } = 0.02f;
         [JsonPropertyName("axisBlendFull")] public float AxisBlendFull { get; set; } = 0.25f;
         // Rest-height offsets and widths are normalised by torso span.
-        [JsonPropertyName("lowerTransitionStart")] public float LowerTransitionStart { get; set; } = .02f;
-        [JsonPropertyName("lowerTransitionWidth")] public float LowerTransitionWidth { get; set; } = .60f;
+        [JsonPropertyName("lowerTransitionStart")] public float LowerTransitionStart { get; set; } = -0.4453125f;
+        [JsonPropertyName("lowerTransitionWidth")] public float LowerTransitionWidth { get; set; } = 0.51025f;
         // Negative: earlier virtual attachment; positive: later.
-        [JsonPropertyName("lowerTransitionBias")] public float LowerTransitionBias { get; set; } = 0f;
+        [JsonPropertyName("lowerTransitionBias")] public float LowerTransitionBias { get; set; } = -0.5625f;
         // Upper start is relative to the original waist/growth datum (TorsoProfile.Navel).
-        [JsonPropertyName("upperTransitionStart")] public float UpperTransitionStart { get; set; } = 0.10542166f;
-        [JsonPropertyName("upperTransitionWidth")] public float UpperTransitionWidth { get; set; } = 0.5965462f;
+        [JsonPropertyName("upperTransitionStart")] public float UpperTransitionStart { get; set; } = 0.22f;
+        [JsonPropertyName("upperTransitionWidth")] public float UpperTransitionWidth { get; set; } = 0.45937502f;
         // Negative: later release to native skinning; positive: earlier release.
-        [JsonPropertyName("upperTransitionBias")] public float UpperTransitionBias { get; set; } = 0f;
-        [JsonPropertyName("upperTransitionJoin")] public float UpperTransitionJoin { get; set; } = .20f;
-        [JsonPropertyName("upperTransitionActivation")] public float UpperTransitionActivation { get; set; } = .02f;
+        [JsonPropertyName("upperTransitionBias")] public float UpperTransitionBias { get; set; } = -1.4875f;
+        [JsonPropertyName("upperTransitionJoin")] public float UpperTransitionJoin { get; set; } = 0.2068125f;
+        [JsonPropertyName("upperTransitionActivation")] public float UpperTransitionActivation { get; set; } = 0.001f;
         // Retained for loading old presets only. The per-frame support pass is retired.
         [JsonPropertyName("upperFoldSupport")] public float UpperFoldSupport { get; set; } = 0f;
         // Trial switches: height transitions remain active independently.
-        [JsonPropertyName("breastExclusionEnabled")] public bool BreastExclusionEnabled { get; set; } = false;
+        [JsonPropertyName("breastExclusionEnabled")] public bool BreastExclusionEnabled { get; set; } = true;
         [JsonPropertyName("upperBoneFilterEnabled")] public bool UpperBoneFilterEnabled { get; set; } = false;
         [JsonPropertyName("upperFieldFadeEnabled")] public bool UpperFieldFadeEnabled { get; set; } = false;
-        [JsonPropertyName("axisPullLow")] public float AxisPullLow { get; set; } = 0.15f;
-        [JsonPropertyName("axisPullHigh")] public float AxisPullHigh { get; set; } = 0.8f;
-        [JsonPropertyName("axisPullAngle")] public float AxisPullAngle { get; set; } = 60f;
+        [JsonPropertyName("axisPullLow")] public float AxisPullLow { get; set; } = 0.6f;
+        [JsonPropertyName("axisPullHigh")] public float AxisPullHigh { get; set; } = 0.9f;
+        [JsonPropertyName("axisPullAngle")] public float AxisPullAngle { get; set; } = 35f;
         [JsonPropertyName("axisAnchorY")] public float AxisAnchorY { get; set; } = 0f;
         [JsonPropertyName("axisAnchorZ")] public float AxisAnchorZ { get; set; } = 0f;
         [JsonPropertyName("skinShadingSmoothing")] public float SkinShadingSmoothing { get; set; } = 0.9859438f;
-        [JsonPropertyName("navelPreviewFull")] public bool NavelPreviewFull { get; set; } = true;
+        [JsonPropertyName("navelPreviewFull")] public bool NavelPreviewFull { get; set; } = false;
 
         // Only the original navel patch is reshaped; never a second landmark.
         [JsonPropertyName("navelEversion")] public float NavelEversion { get; set; } = 1.2971888f;
@@ -124,11 +136,8 @@ namespace ALPregnancy
 
         // ── Breast guard ──────────────────────────────────────────────────
         /// <summary>
-        /// Strength of the breast-guard restore step.
-        /// Vertices weighted to breast bones (mune/bust) are lerped back toward their
-        /// original positions by quinticSmooth(boneWeight × BreastGuardStrength).
-        /// 0 = no guard; 1 = default (only full breast weighting is fully restored).
-        /// Values above 1 guard more aggressively.
+        /// Multiplier on actual breast-physics-chain skin weights. Zero disables
+        /// breast protection; the resulting restore amount is bounded to 0..1.
         /// </summary>
         [JsonPropertyName("breastGuard")] public float BreastGuardStrength { get; set; } = 1f;
 

@@ -52,6 +52,7 @@ internal static class MorphReadiness
         try
         {
             if (__instance == null) return;
+            BodyChangeRuntime.Release(__instance);
             // These synchronous operations replace meshes. Return native meshes
             // before the game rebuilds its own caches. The completed native update
             // reapplies in the same render cycle, without a visible waiting phase.
@@ -69,7 +70,11 @@ internal static class MorphReadiness
         bool first = Reloading.Add(human.Pointer);
         Status = reason;
         if (!known && !first) return;
-        PregnancyRuntime.ReleaseHuman(human);
+        // Native body shape has already committed when Probe invalidates a mesh.
+        // Tear down only belly meshes/bindings here: ReleaseHuman would dispose
+        // the body-data scope and overwrite that completed pose with card values.
+        // Destructive load entry restores body changes in BeforeHumanLoad above.
+        PregnancyRuntime.ReleaseMeshes(human);
         PregnancyController.SuspendHuman(human);
     }
 

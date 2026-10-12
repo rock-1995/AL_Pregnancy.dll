@@ -244,11 +244,13 @@ internal static partial class BellyVertexMorph
                     if (IsLegBoneName(name)) legs.Add(i);
                 }
                 var welds = ComputeNormalWeldGroup(vertices);
-                var excluded = BreastExclusion.Build(ComputeBreastWeights(mesh, original.Length, renderer), original.Length, welds, BellyDeformSettings.Vtx.BreastExclusionEnabled);
+                var breastWeights = ComputeBreastWeights(human, mesh, original.Length, renderer);
+                var excluded = BreastExclusion.BuildFullyProtected(breastWeights, original.Length, welds, BellyDeformSettings.Vtx.BreastExclusionEnabled, BellyDeformSettings.Vtx.BreastGuardStrength);
                 var fold = dynamic && state.Virtual.Fold?.Failed == false ? state.Virtual.Fold : null;
+                var protection = BuildBodyProtection(vertices, mesh, bones, weights, map, FrameMatrix(state.Frame), state.Profile, welds, excluded, breastWeights);
                 var shape = CollisionDeformation.Build(original, map, FrameMatrix(state.Frame), state.Profile, state.LastAppliedRate, BellyDeformSettings.Vtx,
                     ComputeBellyInfluence(mesh, original.Length, belly, legs), excluded, dynamic,
-                    fold == null ? null : fold.Field.Contains);
+                    fold == null ? null : fold.Field.Contains, protection);
                 if (shape.Indices.Length == 0) continue;
                 var skin = new VirtualBinding { Bones = bones, Binds = binds, Weights = weights,
                     NativeMatrices = new NMatrix[bones.Length], NativeTicks = new int[bones.Length] };
