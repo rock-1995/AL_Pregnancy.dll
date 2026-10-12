@@ -27,8 +27,8 @@ internal static class VirtualAxisMath
         var target=Unit(Vector3.Transform(rest.Upper,spine)-anchor,free);
         float cosine=Math.Clamp(Vector3.Dot(free,target),-1,1);
         float angle=MathF.Acos(cosine),degrees=angle*(180/MathF.PI);
-        float low=Math.Clamp(p.AxisPullLow,0,1),high=MathF.Max(low,Math.Clamp(p.AxisPullHigh,0,1));
-        float pull=low+(high-low)*BellyShape.Smooth(degrees/MathF.Max(1,p.AxisPullAngle));
+        float low=p.AxisPullLow,high=p.AxisPullHigh;
+        float pull=low+(high-low)*BellyShape.Smooth(degrees/MathF.Max(1e-6f,MathF.Abs(p.AxisPullAngle)));
         var turnAxis=Vector3.Cross(free,target);
         if(turnAxis.LengthSquared()<1e-10f)
         {
@@ -44,8 +44,8 @@ internal static class VirtualAxisMath
 
     internal static float Weight(float displacement,float span,VtxSettings p)
     {
-        float start=Math.Clamp(p.AxisBlendStart,0,.5f),end=MathF.Max(start+.05f,Math.Clamp(p.AxisBlendFull,.005f,1));
-        return Math.Clamp(p.VirtualAxisStrength,0,1)*BellyShape.Smooth((displacement/MathF.Max(span,1e-5f)-start)/(end-start));
+        float start=p.AxisBlendStart,end=p.AxisBlendFull;
+        return p.VirtualAxisStrength*BellyShape.Smooth((displacement/MathF.Max(span,1e-5f)-start)/NonZero(end-start));
     }
 
     // A displacement threshold alone can switch the entire lower wall to the
@@ -55,17 +55,20 @@ internal static class VirtualAxisMath
     // does not depend on pose angle, mesh density, or world orientation.
     internal static float SurfaceWeight(float displacement, float materialY, TorsoProfile torso, VtxSettings p)
     {
-        float start = torso.PelvicFloor + Parameter(p.LowerTransitionStart, .02f, -.50f, .75f) * torso.Span;
-        float u = Math.Clamp((materialY - start) / MathF.Max(torso.Span * Parameter(p.LowerTransitionWidth, .60f, .02f, 1.50f), 1e-5f), 0, 1);
+        float start = torso.PelvicFloor + Parameter(p.LowerTransitionStart, .02f) * torso.Span;
+        float u = Math.Clamp((materialY - start) / NonZero(torso.Span * Parameter(p.LowerTransitionWidth, .60f)), 0, 1);
         float attachment = LowerAttachment(u, p.LowerTransitionBias);
         return Weight(displacement, torso.Span, p) * attachment;
     }
 
-    internal static float Parameter(float value, float fallback, float min, float max)
-        => float.IsFinite(value) ? Math.Clamp(value, min, max) : fallback;
+    // Only a numerical singularity guard, never a recommended-range clamp.
+    internal static float NonZero(float value) => MathF.Abs(value)<1e-6f ? (value<0 ? -1e-6f : 1e-6f) : value;
+
+    internal static float Parameter(float value, float fallback)
+        => float.IsFinite(value) ? value : fallback;
 
     internal static float UpperStart(TorsoProfile torso, VtxSettings p)
-        => torso.Navel + Parameter(p.UpperTransitionStart, .15f, -.50f, 1f) * torso.Span;
+        => torso.Navel + Parameter(p.UpperTransitionStart, .15f) * torso.Span;
 
     internal static float UpperRelease(float u, float bias) => 1 - LowerAttachment(u, -bias);
 
@@ -77,14 +80,16 @@ internal static class VirtualAxisMath
         TorsoProfile torso, float stage, VtxSettings p, float influence = 1f)
     {
         if (stage <= 0 || !float.IsFinite(displacement) || displacement <= 0 || influence <= 0) return 0;
-        float baseline = SurfaceWeight(displacement, original.Y, torso, p);
+        float materialY = HeightBoundary.Coordinate(original, torso, p);
+        float baseline = SurfaceWeight(displacement, materialY, torso, p);
         float start = UpperStart(torso, p);
-        if (original.Y <= start) return baseline;
-        float width = Parameter(p.UpperTransitionWidth, .55f, .02f, 1.50f) * torso.Span;
-        float u = (original.Y - start) / MathF.Max(width, 1e-5f);
+        if (materialY <= start) return baseline;
+        float width = Parameter(p.UpperTransitionWidth, .55f) * torso.Span;
+        float u = (materialY - start) / NonZero(width);
         if (u >= 1 || displacement <= 0 || stage <= 0 || p.VirtualAxisStrength <= 0) return 0;
         float angle = MathF.Atan2(original.X, original.Z - torso.AxisAt(original.Y));
         if (MathF.Abs(angle) >= MathF.PI * .5f) return 0;
+        float anchorHeight = HeightBoundary.Height(start, angle, torso, p);
         float sn = MathF.Sin(angle), cs = MathF.Cos(angle);
         float Radius(float y)
         {
@@ -95,16 +100,16 @@ internal static class VirtualAxisMath
         // Preserve the original surface's radial detail while transporting it
         // to the anchor height; identical material points need identical rules.
         float radial = MathF.Sqrt(original.X * original.X + MathF.Pow(original.Z - torso.AxisAt(original.Y), 2));
-        float radius = MathF.Max(0, Radius(start) + radial - Radius(original.Y));
-        var anchor = new Vector3(radius * sn, start, torso.AxisAt(start) + radius * cs);
-        float anchorDelta = Vector3.Distance(anchor, BellyShape.Deform(anchor, torso, stage, p)) * Parameter(influence, 1, 0, 1);
+        float radius = MathF.Max(0, Radius(anchorHeight) + radial - Radius(original.Y));
+        var anchor = new Vector3(radius * sn, anchorHeight, torso.AxisAt(anchorHeight) + radius * cs);
+        float anchorDelta = Vector3.Distance(anchor, BellyShape.Deform(anchor, torso, stage, p)) * Parameter(influence, 1);
         float entry = SurfaceWeight(anchorDelta, start, torso, p);
         float target = entry * UpperRelease(u, p.UpperTransitionBias);
-        float activation = BellyShape.Smooth(displacement / MathF.Max(torso.Span * Parameter(p.UpperTransitionActivation, .02f, .001f, .15f), 1e-5f));
+        float activation = BellyShape.Smooth(displacement / NonZero(torso.Span * Parameter(p.UpperTransitionActivation, .02f)));
         target *= activation;
         // A short zero-slope join preserves the lower formula exactly below
         // the chosen start, even on detailed skin or overlapping user bands.
-        float join = BellyShape.Smooth(u / Parameter(p.UpperTransitionJoin, .20f, .02f, 1f));
+        float join = BellyShape.Smooth(u / NonZero(Parameter(p.UpperTransitionJoin, .20f)));
         return baseline + (target - baseline) * join;
     }
 
@@ -114,11 +119,12 @@ internal static class VirtualAxisMath
     internal static float LowerAttachment(float u, float bias)
     {
         u = Math.Clamp(u, 0, 1);
-        bias = float.IsFinite(bias) ? Math.Clamp(bias, -2, 2) : 0;
+        bias = float.IsFinite(bias) ? bias : 0;
         if (bias != 0)
         {
-            float scale = MathF.Pow(2, bias);
-            u /= u + (1 - u) * scale;
+            if(u<=0 || u>=1)return u;
+            if(bias>=0){float inverse=MathF.Pow(2,-bias);u=u*inverse/(1-u+u*inverse);}
+            else u/=u+(1-u)*MathF.Pow(2,bias);
         }
         return u * u * (3 - 2 * u);
     }
@@ -130,7 +136,7 @@ internal static class VirtualAxisMath
     // Fade this control in above BOTH the navel and the lower transition.
     internal static float UpperAttachment(float weight, float materialY, TorsoProfile torso, float bias, float ceiling = 1f)
     {
-        bias = float.IsFinite(bias) ? Math.Clamp(bias, -2, 2) : 0;
+        bias = float.IsFinite(bias) ? bias : 0;
         if (bias == 0 || weight <= 0 || weight >= ceiling) return weight;
         float start = MathF.Max(torso.Navel + .15f * torso.Span, torso.PelvicFloor + .62f * torso.Span);
         float extent = torso.Ribs - start;
@@ -152,4 +158,47 @@ internal static class VirtualAxisMath
     }
     internal static Vector3 Unit(Vector3 v,Vector3 fallback)=>v.LengthSquared()>1e-12f?Vector3.Normalize(v):fallback;
     internal static bool Finite(Matrix4x4 m)=>float.IsFinite(m.M11+m.M12+m.M13+m.M14+m.M21+m.M22+m.M23+m.M24+m.M31+m.M32+m.M33+m.M34+m.M41+m.M42+m.M43+m.M44);
+}
+
+// One rest-space latitude for every height-limited deformation/attachment band.
+// Central heights stay as configured. Both sides approach the same fixed belly
+// centre: upper contours arch upward, lower contours arch downward. The centre
+// uses the full-term envelope so advancing pregnancy cannot slide the bands.
+internal static class HeightBoundary
+{
+    private readonly record struct Key(float Reach, float Lift, float Range, float Settle);
+    private sealed class Cache { internal Key Key; internal float Center; internal bool Ready; }
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TorsoProfile, Cache> Centers = new();
+    internal static float Center(TorsoProfile torso, VtxSettings p)
+    {
+        if (!Centers.TryGetValue(torso, out var cache)) { cache = new Cache(); Centers.Add(torso, cache); }
+        var key = new Key(p.UpperReach, p.LowerPoleLift, p.VerticalRange, p.LateSettle);
+        if (!cache.Ready || cache.Key != key)
+        {
+            var full = BellyShape.Growth(torso, 1, p);
+            cache.Center = (full.Bottom + full.Top) * .5f;
+            cache.Key = key; cache.Ready = true;
+        }
+        return cache.Center;
+    }
+    internal static float Scale(float angle, float amount)
+    {
+        amount = float.IsFinite(amount) ? MathF.Max(0, amount) : .35f;
+        float side = MathF.Sin(angle);
+        return MathF.Max(1e-6f, 1 / (1 + amount * side * side));
+    }
+    internal static float Coordinate(float y, float angle, float center, float amount)
+    {
+        float scale = Scale(angle, amount);
+        return scale == 1 ? y : center + (y - center) / scale;
+    }
+    internal static float Coordinate(Vector3 original, TorsoProfile torso, VtxSettings p)
+        => Coordinate(original.Y, MathF.Atan2(original.X, original.Z - torso.AxisAt(original.Y)), Center(torso, p), p.HeightBoundaryArc);
+    internal static float Height(float level, float angle, TorsoProfile torso, VtxSettings p)
+    {
+        float scale = Scale(angle, p.HeightBoundaryArc);
+        if (scale == 1) return level;
+        float center = Center(torso, p);
+        return center + (level - center) * scale;
+    }
 }

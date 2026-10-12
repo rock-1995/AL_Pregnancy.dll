@@ -110,7 +110,7 @@ namespace ALPregnancy
                     }
                     if (data.Version < 4)
                     {
-                        float legacy = Vtx.ClothOffset > 0.01f ? Vtx.ClothOffset : 1.01f;
+                        float legacy = Vtx.ClothOffset;
                         Vtx.ClothTopMult = legacy;
                         Vtx.ClothBotMult = legacy;
                         Vtx.ClothBraMult = legacy;

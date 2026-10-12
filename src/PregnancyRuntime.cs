@@ -436,15 +436,13 @@ internal static class PregnancyRuntime
             }
         }
     }
-    internal static void UpdateHumanVisual(Human human)
+    internal static PregnancyRecord FindVisualRecord(Human human)
     {
-        if (human == null) return;
-        if (!PregnancyPlugin.Enabled.Value || PregnancyController.ManualPreviewActive || !human.HiPoly || human.Sex != 1)
-        { Release(human.Pointer); return; }
+        if (human == null || !PregnancyPlugin.Enabled.Value || PregnancyController.ManualPreviewActive || !human.HiPoly || human.Sex != 1) return null;
         var data = Current();
-        if (data == null || !data.Ready) return;
+        if (data == null || !data.Ready) return null;
         if (!Same(data)) Activate(data);
-        if (!Active) return;
+        if (!Active) return null;
         PregnancyRecord record = null;
         var game = Game.Instance;
         if (game?.Heroines != null)
@@ -459,6 +457,14 @@ internal static class PregnancyRuntime
             foreach (var actor in scene.Actors)
                 if (actor?.NPCData != null && actor.Human?.Pointer == human.Pointer)
                 { World.Characters.TryGetValue(ActorKey(actor.NPCData), out record); break; }
+        return record;
+    }
+    internal static void UpdateHumanVisual(Human human)
+    {
+        if (human == null) return;
+        if (!PregnancyPlugin.Enabled.Value || PregnancyController.ManualPreviewActive || !human.HiPoly || human.Sex != 1)
+        { Release(human.Pointer); return; }
+        var record = FindVisualRecord(human);
         if (record == null) return; // The native actor owner may still be assigning this Human.
         float growth = record.Growth(PregnancyConfig.Rules);
         if (growth <= 0) { Release(human.Pointer); return; }
@@ -484,7 +490,12 @@ internal static class PregnancyRuntime
         try { BellyVertexMorph.Forget(visual.Id); }
         finally { visual.Lease.Dispose(); }
     }
-    internal static void ReleaseHuman(Human human) { if (human != null) Release(human.Pointer); }
-    internal static void ReleaseVisuals() { foreach (var pointer in Visuals.Keys.ToArray()) Release(pointer); }
+    internal static void ReleaseMeshes(Human human) { if (human != null) Release(human.Pointer); }
+    internal static void ReleaseHuman(Human human) { ReleaseMeshes(human); BodyChangeRuntime.Release(human); }
+    internal static void ReleaseVisuals()
+    {
+        foreach (var pointer in Visuals.Keys.ToArray()) Release(pointer);
+        BodyChangeRuntime.ReleaseAll();
+    }
     internal static void Shutdown() { FinishWrites(true); ReleaseVisuals(); }
 }

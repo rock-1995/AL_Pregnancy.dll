@@ -13,6 +13,8 @@ internal static class PregnancyConfig
     internal static ConfigEntry<float> Fixed, Safe, Normal, Danger, Complex, Decay, Variation;
     internal static ConfigEntry<float> GrowthStart, GrowthEarlyEnd, GrowthMiddleEnd, GrowthLateStart;
     internal static ConfigEntry<int> NormalStart, NormalEnd, DangerStart, DangerEnd, Ovulation, Gestation, Recovery;
+    internal static ConfigEntry<int> BodyBirths, BodyLower, BodyUpper;
+    internal static ConfigEntry<float> NippleColorMaximum;
     internal static void Bind(ConfigFile config)
     {
         if (_file != null) _file.SettingChanged -= OnSettingChanged;
@@ -40,6 +42,14 @@ internal static class PregnancyConfig
         GrowthEarlyEnd = Timing("Stage 1 end percent", 20, "End of stage 1, reaching the early belly shape. Stage 2 follows.", 97);
         GrowthMiddleEnd = Timing("Stage 2 end percent", 45, "End of stage 2, reaching the middle belly shape. Stage 3 follows.", 98);
         GrowthLateStart = Timing("Stage 3 end percent", 70, "End of stage 3 and start of the final growth stage. The final shape is reached at 100%, with linear growth within each stage.");
+        BodyBirths = config.Bind("Pregnancy body changes", "Births for full change", 5,
+            "Integer x. Body change = (reference.png - base.png) x (births + normalized pregnancy progress) / x. At births >= x use the full difference. Postpartum changes persist. x <= 0 means full difference immediately.");
+        BodyLower = config.Bind("Pregnancy body changes", "Minimum slider value", 0,
+            "Integer lower limit in character creator units (100 = normalized 1). Negative values are allowed. Applies only to channels changed by the templates. Reversed limits are ordered for calculation without changing the entered values.");
+        BodyUpper = config.Bind("Pregnancy body changes", "Maximum slider value", 100,
+            "Integer upper limit in character creator units. Values above 100 are allowed. No extra limit is imposed. Values are clamped after adding the template difference to each character's own original values.");
+        NippleColorMaximum = config.Bind("Pregnancy body changes", "Nipple color progress maximum", .85f,
+            new ConfigDescription("Maximum nipple color change progress, independent of full body progress. Color uses min(body progress, this value), then adds the reference - base RGBA difference to the character's original color. 0 disables color changes; default 0.85.", new AcceptableValueRange<float>(0, 1)));
         _file = config;
         _file.SettingChanged += OnSettingChanged;
     }

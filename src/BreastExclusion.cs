@@ -1,9 +1,20 @@
 namespace ALPregnancy;
 
-// Optional native breast ownership exclusion; disabled in the 0.2.22 trial.
-// UV duplicates share the exclusion; neighboring abdomen vertices do not.
+// Full-protection mask for the weighted breast guard. The historical binary
+// builder remains available to replay old snapshots without changing them.
 internal static class BreastExclusion
 {
+    internal static float RestoreAmount(float physicsWeight, float strength, bool enabled = true)
+        => enabled ? Math.Clamp(Math.Clamp(physicsWeight, 0, 1) * MathF.Max(0, strength), 0, 1) : 0;
+    internal static bool[] BuildFullyProtected(float[] weights, int count, int[] weldGroups = null, bool enabled = true, float strength = 1)
+    {
+        var mask = new bool[count];
+        if (weights != null)
+            for (int i = 0; i < Math.Min(count, weights.Length); i++)
+                mask[i] = RestoreAmount(weights[i], strength, enabled) >= 1 - 1e-6f;
+        ShareWelds(mask, weldGroups);
+        return mask;
+    }
     internal static bool[] Build(float[] weights, int count, int[] weldGroups = null, bool enabled = true)
     {
         var mask = new bool[count];

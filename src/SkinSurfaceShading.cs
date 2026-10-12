@@ -153,8 +153,7 @@ internal static class SkinSurfaceShading
         // Smooth the change of orientation, not the authored skin detail or
         // geometry. Shared UV/body seam groups use one rotation. The original
         // navel's compact patch is excluded so eversion remains visible.
-        smoothing=Math.Clamp(smoothing,0,1);
-        for(int pass=0;pass<3 && smoothing>0;pass++)
+        for(int pass=0;pass<3 && smoothing!=0;pass++)
         {
             var next=(Quaternion[])rotations.Clone();
             for(int i=0;i<groups.Count;i++)

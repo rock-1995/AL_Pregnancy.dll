@@ -14,7 +14,7 @@ internal sealed class CollisionDeformation
 
     internal static CollisionDeformation Build(Vector3[] original, Matrix4x4 toReference, Matrix4x4 frame,
         TorsoProfile profile, float stage, VtxSettings settings, float[] influence, bool[] excluded,
-        bool virtualActive, Func<Vector3, bool> supportContains)
+        bool virtualActive, Func<Vector3, bool> supportContains, float[] protectionKeep = null)
     {
         if (!Matrix4x4.Invert(frame, out var inverseFrame) || !Matrix4x4.Invert(toReference, out var fromReference))
             throw new InvalidOperationException("Invalid low-poly rest frame.");
@@ -26,10 +26,10 @@ internal sealed class CollisionDeformation
             var local = Vector3.Transform(original[i], toReference * inverseFrame);
             result.Material[i] = local / profile.Span;
             if (BreastExclusion.Contains(excluded, i)) continue;
-            float effective = BellyShape.DeformationInfluence(influence[i], local.Y, profile, settings);
+            float effective = BellyShape.DeformationInfluence(influence[i], local, profile, settings);
             if (effective > 0)
             {
-                var delta = (BellyShape.Deform(local, profile, stage, settings) - local) * effective;
+                var delta = (BellyShape.Deform(local, profile, stage, settings) - local) * effective * BodyProtection.Keep(protectionKeep, i);
                 result.Static[i] += Vector3.TransformNormal(delta, frame * fromReference);
             }
             result.Candidates[i] = virtualActive && supportContains?.Invoke(result.Material[i]) == true;
@@ -39,7 +39,7 @@ internal sealed class CollisionDeformation
             for (int i = 0; i < n; i++)
                 if (!BreastExclusion.Contains(excluded, i))
                     result.Blend[i] = VirtualAxisMath.MaterialSurfaceWeight(Vector3.TransformNormal(result.Static[i] - original[i], toReference).Length(),
-                        result.Material[i] * profile.Span, profile, stage, settings, BellyShape.DeformationInfluence(influence[i], result.Material[i].Y * profile.Span, profile, settings));
+                        result.Material[i] * profile.Span, profile, stage, settings, BellyShape.DeformationInfluence(influence[i], result.Material[i] * profile.Span, profile, settings)) * BodyProtection.Keep(protectionKeep, i);
         }
         result.Indices = Enumerable.Range(0, n).Where(i => !BreastExclusion.Contains(excluded, i) &&
             (Vector3.DistanceSquared(original[i], result.Static[i]) > 1e-14f || result.Blend[i] > 0 || result.Candidates[i])).ToArray();

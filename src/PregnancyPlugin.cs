@@ -9,7 +9,7 @@ using UnityEngine;
 namespace ALPregnancy;
 
 // Preserve the legacy ID so existing configuration and plugin references remain valid.
-[BepInPlugin("local.al.pregnancy.preview", "AL Pregnancy", "0.2.27")]
+[BepInPlugin("local.al.pregnancy.preview", "AL Pregnancy", "0.2.40")]
 [BepInDependency(PatchCompatibility.UncensorGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInProcess("AmanatsuLocation.exe")]
 public sealed class PregnancyPlugin : BasePlugin
@@ -49,10 +49,12 @@ public sealed class PregnancyPlugin : BasePlugin
             prefix: new HarmonyMethod(typeof(PregnancyPlugin), nameof(BeforeHumanDispose)));
         _harmony.Patch(AccessTools.Method(typeof(Human), "LateUpdate"),
             postfix: new HarmonyMethod(typeof(PregnancyPlugin), nameof(AfterHumanLateUpdate)) { priority = Priority.Last });
+        _harmony.Patch(AccessTools.Method(typeof(HumanBody), nameof(HumanBody.UpdateShapeBody)),
+            postfix: new HarmonyMethod(typeof(BodyChangeRuntime), nameof(BodyChangeRuntime.NativeShapeUpdated)) { priority = Priority.Last });
         PregnancyRuntime.Install(_harmony);
         MorphReadiness.Install(_harmony);
         BellyVertexMorph.InstallCollisionSync(_harmony);
-        Log.LogInfo("AL Pregnancy 0.2.27 loaded. Direct low-poly collision inputs; batch Obi mesh invalidation before world readers to preserve global mesh indices; accepted F8 defaults; original F1 defaults; configurable linear growth stages; independent daily progress variation.");
+        Log.LogInfo("AL Pregnancy 0.2.40 loaded. Belly geometry first, native body customization second, virtual binding and pose last.");
     }
 
     internal static void TickStartupConfig() => _startupConfig?.Tick(Time.unscaledTime);
@@ -67,18 +69,7 @@ public sealed class PregnancyPlugin : BasePlugin
     {
         try
         {
-            if (__instance == null || __instance.Disposed || !__instance.HiPoly || __instance.Sex != 1) return;
-            if (!MorphReadiness.EnterNativeBoundary(__instance)) return;
-            try
-            {
-                PregnancyRuntime.UpdateHumanVisual(__instance);
-                PregnancyController.AfterNativeUpdate(__instance);
-                // Even during scene fades/relocation, the existing palette and
-                // world bounds must follow this completed native actor pose.
-                BellyVertexMorph.UpdateVirtual(__instance);
-                BellyVertexMorph.UpdateBodyCollision(__instance);
-            }
-            finally { MorphReadiness.ExitNativeBoundary(); }
+            NativeVisualUpdate.Complete(__instance);
         }
         catch (Exception ex)
         {

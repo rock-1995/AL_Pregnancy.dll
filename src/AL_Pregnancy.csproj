@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>AL_Pregnancy</AssemblyName>
-    <Version>0.2.27</Version>
+    <Version>0.2.40</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
@@ -13,6 +13,7 @@
     <CoreDir Condition="'$(CoreDir)' == ''">$(GameDir)\BepInEx\core</CoreDir>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="../templates/*.png" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Compile Remove="CollisionSurfaceMap.cs" />
     <Reference Include="$(InteropDir)\*.dll"><Private>false</Private></Reference>
     <Reference Include="$(CoreDir)\BepInEx.Core.dll"><Private>false</Private></Reference>

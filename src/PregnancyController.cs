@@ -1,4 +1,5 @@
 using Character;
+using System.Globalization;
 using Il2CppInterop.Runtime.Attributes;
 using UnityEngine;
 
@@ -25,6 +26,7 @@ public sealed class PregnancyController : MonoBehaviour
     private float _contentHeight=1800;
     private GUI.WindowFunction _draw;
     private GUIStyle _statusStyle;
+    private readonly Dictionary<string, ShapeInput> _shapeInputs = new();
 
     public PregnancyController(IntPtr pointer) : base(pointer) { _instance = this; }
 
@@ -185,7 +187,7 @@ public sealed class PregnancyController : MonoBehaviour
             _window.height = Mathf.Min(610, Screen.height - 30);
             _window.x = Mathf.Clamp(_window.x, 0, Mathf.Max(0, Screen.width - _window.width));
             _window.y = Mathf.Clamp(_window.y, 0, Mathf.Max(0, Screen.height - _window.height));
-            _window = GUI.Window(0x414C50, _window, _draw, "AL Pregnancy 0.2.27 - F8");
+            _window = GUI.Window(0x414C50, _window, _draw, "AL Pregnancy 0.2.40 - F8");
         }
         catch (Exception ex)
         {
@@ -244,20 +246,24 @@ public sealed class PregnancyController : MonoBehaviour
             _status = "Original meshes restored. Preview is OFF.";
         }
         y += 38;
-        _rate = Slider("Growth stage", _rate, 0, 1, ref y, width);
+        _rate = StageSlider(_rate, ref y, width);
+        GUI.Label(new Rect(0,y,width,24),"Sliders: recommended ranges. Numeric inputs: unrestricted.");y+=28;
         VtxSettings p = BellyDeformSettings.Vtx;
         p.GrowthFullness = Slider("Forward fullness", p.GrowthFullness, 0.5f, 1.6f, ref y, width);
         p.GrowthWidth = Slider("Belly width", p.GrowthWidth, 0.5f, 2f, ref y, width);
         p.UpperReach = Slider("Upper abdomen reach", p.UpperReach, 0.75f, 1.2f, ref y, width);
         p.VerticalRange = Slider("Vertical influence range", p.VerticalRange, .6f, 1.2f, ref y, width);
         p.WallSmoothing = Slider("Whole-abdomen smoothing", p.WallSmoothing, 0, 2, ref y, width);
-        p.SagStrength = Slider("Belly sag (0 = off)", p.SagStrength, 0, 2, ref y, width);
+        p.SagStrength = Slider("Surface slide / density (legacy sag)", p.SagStrength, 0, 2, ref y, width);
+        p.BellySag = Slider("Belly sag (downward shift)", p.BellySag, 0, 2, ref y, width);
         p.MidVolume = Slider("Second-stage volume", p.MidVolume, .75f, 1.5f, ref y, width);
         p.LowerPoleLift = Slider("Late lower-pole lift", p.LowerPoleLift, 0, 2, ref y, width);
         p.SkinClearance = Slider("Skin clearance", p.SkinClearance, 0, .2f, ref y, width);
         p.LateSettle = Slider("Late settling", p.LateSettle, 0, 1, ref y, width);
+        float beforeClothing=p.ClothOffset;
         p.ClothOffset = Slider("Clothing displacement", p.ClothOffset, 0.8f, 1.3f, ref y, width);
-        p.ClothTopMult = p.ClothBotMult = p.ClothBraMult = p.ClothShortsMult = p.ClothPanstMult = p.ClothOtherMult = p.ClothOffset;
+        if(p.ClothOffset!=beforeClothing)
+            p.ClothTopMult = p.ClothBotMult = p.ClothBraMult = p.ClothShortsMult = p.ClothPanstMult = p.ClothOtherMult = p.ClothOffset;
         GUI.Label(new Rect(0,y,width,24),"Virtual axis / pose response");y+=28;
         p.VirtualAxisStrength=Slider("Virtual axis strength (0 = native)",p.VirtualAxisStrength,0,1,ref y,width);
         p.AxisBlendStart=Slider("Blend start / torso span",p.AxisBlendStart,0,.15f,ref y,width);
@@ -272,8 +278,16 @@ public sealed class PregnancyController : MonoBehaviour
         p.UpperTransitionBias=Slider("Upper curve bias (- hold / + release)",p.UpperTransitionBias,-2,2,ref y,width);
         p.UpperTransitionJoin=Slider("Upper join / transition width",p.UpperTransitionJoin,.02f,1f,ref y,width);
         p.UpperTransitionActivation=Slider("Upper activation displacement / span",p.UpperTransitionActivation,.001f,.15f,ref y,width);
-        GUI.Label(new Rect(0,y,width,24),"Additional restrictions (trial defaults: OFF)");y+=28;
-        p.BreastExclusionEnabled=Toggle("Exclude breast-weighted vertices",p.BreastExclusionEnabled,ref y,width);
+        GUI.Label(new Rect(0,y,width,24),"Boundary protection / optional filters");y+=28;
+        p.HeightBoundaryArc=Slider("Height boundary arc (0 = straight)",p.HeightBoundaryArc,0,1,ref y,width);
+        p.BreastExclusionEnabled=Toggle("Breast physics-weight guard",p.BreastExclusionEnabled,ref y,width);
+        p.BreastGuardStrength=Slider("Breast guard strength x physics weight",p.BreastGuardStrength,0,4,ref y,width);
+        p.LowerBreastGuardWidth=Slider("Below-breast guard width / span (0 = off)",p.LowerBreastGuardWidth,0,.35f,ref y,width);
+        p.ThighGuardSpeed=Slider("Thigh side guard speed (0 = off)",p.ThighGuardSpeed,0,8,ref y,width);
+        p.InnerThighGuardStrength=Slider("Thigh bone guard (0 = off)",p.InnerThighGuardStrength,0,4,ref y,width);
+        p.ThighGuardWidth=Slider("Thigh guard transition width / span",p.ThighGuardWidth,0,.5f,ref y,width);
+        p.BottomGuardStrength=Slider("Lowest belly / pubic guard (0 = off)",p.BottomGuardStrength,0,1,ref y,width);
+        p.BottomGuardWidth=Slider("Lowest belly guard width / span",p.BottomGuardWidth,0,.5f,ref y,width);
         p.UpperBoneFilterEnabled=Toggle("Upper abdomen bone-weight filter",p.UpperBoneFilterEnabled,ref y,width);
         p.UpperFieldFadeEnabled=Toggle("Extra shape-field top fade",p.UpperFieldFadeEnabled,ref y,width);
         p.AxisPullLow=Slider("Pull at small angles",p.AxisPullLow,0,1,ref y,width);
@@ -337,13 +351,33 @@ public sealed class PregnancyController : MonoBehaviour
     }
 
     [HideFromIl2Cpp]
+    private float StageSlider(float value, ref float y, float width)
+    {
+        GUI.Label(new Rect(0,y,width,24),$"Growth stage: {value:F3}");
+        float next=GUI.HorizontalSlider(new Rect(0,y+25,width,20),value,0,1);
+        if(next!=value)BellyVertexMorph.InvalidateAll();
+        y+=49;return next;
+    }
+
+    [HideFromIl2Cpp]
     private float Slider(string label, float value, float min, float max, ref float y, float width)
     {
-        GUI.Label(new Rect(0, y, width, 24), $"{label}: {value:F3}");
-        float next = GUI.HorizontalSlider(new Rect(0, y + 25, width, 20), value, min, max);
-        y += 49;
-        if (!Mathf.Approximately(value, next)) BellyVertexMorph.InvalidateAll();
-        return next;
+        if(!_shapeInputs.TryGetValue(label,out var input))_shapeInputs[label]=input=new ShapeInput();
+        input.Synchronize(value);
+        float before=value;
+        GUI.Label(new Rect(0,y,width,24),label);
+        float shown=ShapeInput.SliderPosition(value,min,max);
+        float next=ShapeInput.FromSlider(value,GUI.HorizontalSlider(new Rect(0,y+25,width-178,20),shown,min,max),min,max);
+        if(next!=value){value=next;input.Synchronize(value);}
+        input.Text=GUI.TextField(new Rect(width-170,y+22,108,24),input.Text);
+        bool valid=ShapeInput.TryRead(input.Text,out float typed);
+        bool enabled=GUI.enabled;GUI.enabled=enabled&&valid;
+        if(GUI.Button(new Rect(width-58,y+22,58,24),"Apply")){value=typed;input.Synchronize(value);}
+        GUI.enabled=enabled;
+        if(value!=before)BellyVertexMorph.InvalidateAll();
+        y+=52;
+        if(!valid){GUI.Label(new Rect(0,y,width,24),"Enter a finite number; scientific notation is supported.");y+=26;}
+        return value;
     }
 
     [HideFromIl2Cpp]

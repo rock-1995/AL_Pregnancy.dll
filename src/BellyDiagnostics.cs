@@ -25,6 +25,8 @@ internal static partial class BellyVertexMorph
                 Mesh mesh = smr.sharedMesh;
                 var record = records == null ? null : FindRecord(records, mesh);
                 Transform[] bones = smr.bones;
+                var nativeBones = record?.Virtual?.Bones ?? bones;
+                var breastPhysics = BreastPhysicsBones(nativeBones, BreastPhysicsRoots(human));
                 Matrix4x4[] poses = mesh.bindposes;
                 Vector3[] current = active ? mesh.vertices : null;
                 Vector3[] original = active ? record?.OrigVerts ?? current : null;
@@ -50,6 +52,12 @@ internal static partial class BellyVertexMorph
                     normals=active?Array.ConvertAll((Vector3[])mesh.normals,Components):null,
                     tangents=active?Array.ConvertAll((Vector4[])mesh.tangents,t=>new[]{t.x,t.y,t.z,t.w}):null,
                     boneNames = Array.ConvertAll(bones, b => b?.name ?? ""),
+                    nativeBonePaths = Array.ConvertAll(nativeBones, b => b == null ? "" : PathOf(b)),
+                    breastPhysics = new {
+                        source = "HumanBody.magicaSpringSetting.Get(Bust).Spring.SerializeData.rootBones",
+                        rootPaths = BreastPhysicsRootPaths(human),
+                        skinBoneIndices = Enumerable.Range(0, nativeBones.Length).Where(i => breastPhysics[i]).ToArray()
+                    },
                     bindposesRowMajor = Array.ConvertAll(poses, m => MatrixValues(MatrixBridge.ToManaged(m))),
                     originalBindposesRowMajor=record?.Virtual==null?null:Array.ConvertAll(record.Virtual.Binds,m=>MatrixValues(MatrixBridge.ToManaged(m))),
                     virtualBoneIndex=record?.Virtual?.Binds.Length ?? -1,
@@ -58,6 +66,14 @@ internal static partial class BellyVertexMorph
                     upperFoldSingular=record?.Virtual?.Fold?.Singular ?? 0,
                     upperFoldMaxWorld=record?.Virtual?.Fold?.MaxWorld ?? 0,
                     virtualPaletteRecipes=record?.Virtual?.Recipes.Select(r=>new {bone=r.Bone,virtualShare=r.VirtualShare}).ToArray(),
+                    skirtDrape=record?.Virtual?.Skirt==null?null:new {
+                        controlled=record.Virtual.Skirt.Plan.Controlled,
+                        released=record.Virtual.Skirt.Plan.Released,
+                        offsets=Array.ConvertAll(record.Virtual.Skirt.Plan.Offsets,Vec),
+                        bindOffsets=Array.ConvertAll(record.Virtual.Skirt.Plan.BindOffsets,Vec),
+                        free=record.Virtual.Skirt.Plan.Free,
+                        recipes=record.Virtual.Skirt.Recipes.Select(r=>new {bone=r.Bone,alpha=r.Alpha,free=r.Free}).ToArray()
+                    },
                     originalSkinWeights=record?.Virtual==null?null:Array.ConvertAll(record.Virtual.Weights,w=>new float[]{w.boneIndex0,w.weight0,w.boneIndex1,w.weight1,w.boneIndex2,w.weight2,w.boneIndex3,w.weight3}),
                     skinToWorldRowMajor = skinToWorld == null ? null : Array.ConvertAll(skinToWorld, MatrixValues),
                     rendererToWorldRowMajor = MatrixValues(rendererToWorld),
@@ -67,7 +83,10 @@ internal static partial class BellyVertexMorph
                     staticDeformed = active && record?.LastNewV!=null ? Array.ConvertAll(record.LastNewV,Components) : null,
                     triangles = active ? (int[])mesh.triangles : null,
                     influence = record?.BellyInfluence,
+                    protectionKeep = record?.ProtectionKeep,
                     breastWeights = record?.BreastWeights,
+                    breastGuardRestore = record?.BreastWeights == null ? null : Array.ConvertAll(record.BreastWeights,
+                        w => BreastExclusion.RestoreAmount(w, BellyDeformSettings.Vtx.BreastGuardStrength, BellyDeformSettings.Vtx.BreastExclusionEnabled)),
                     breastExcluded = record?.BreastExcluded,
                     skinWeights = weights == null ? null : Array.ConvertAll(weights, w => new float[] { w.boneIndex0, w.weight0, w.boneIndex1, w.weight1, w.boneIndex2, w.weight2, w.boneIndex3, w.weight3 })
                 });
@@ -85,14 +104,17 @@ internal static partial class BellyVertexMorph
             var options = new JsonSerializerOptions { NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals };
             var rig=state?.Virtual;
             object virtualAxis=rig==null?null:new {pelvis=rig.Pelvis?.name,spine=rig.Spine?.name,anchor=Vec(rig.Reference.Anchor),upper=Vec(rig.Reference.Upper),angle=rig.Last.AngleDegrees,pull=rig.Last.Pull,transform=MatrixValues(rig.Last.Transform),failed=rig.Failed,
+                pelvisPhysicsRemoved=rig.PelvisDriver.RemovedPhysicsRoots,spinePhysicsRemoved=rig.SpineDriver.RemovedPhysicsRoots,
+                pelvisDriverWorld=MatrixValues(rig.PelvisDriver.World()),spineDriverWorld=MatrixValues(rig.SpineDriver.World()),
                 updateCount=rig.UpdateCount,paletteWrites=rig.PaletteWrites,
+                appliedLowerStart=rig.LowerStart,appliedLowerWidth=rig.LowerWidth,appliedLowerBias=rig.LowerBias,
                 meanUpdateMs=rig.UpdateCount==0?0:rig.UpdateTicks*1000.0/System.Diagnostics.Stopwatch.Frequency/rig.UpdateCount,
                 maxUpdateMs=rig.MaxTicks*1000.0/System.Diagnostics.Stopwatch.Frequency};
             var support=rig?.Fold;
             object upperFold=support==null?null:new {failed=support.Failed,validColumns=support.Field.ValidColumns,activeColumns=support.Field.ActiveColumns,
                 low=support.Field.Low,high=support.Field.High,maxNormalizedCorrection=support.Field.MaxCorrection,writes=support.Writes,
                 movedVertices=support.Meshes.Sum(m=>m.Moved),singularVertices=support.Meshes.Sum(m=>m.Singular),hiddenReferences=support.Sources.Count(s=>s.ReadOnlySource)};
-            File.WriteAllText(path, JsonSerializer.Serialize(new { version = "0.2.27", deformationMode = "native-completion-material-height-no-boundary-rings", frame, anatomy = state?.Profile, virtualAxis, upperFold,
+            File.WriteAllText(path, JsonSerializer.Serialize(new { version = "0.2.40", deformationMode = "native-completion-material-height-no-boundary-rings", frame, anatomy = state?.Profile, virtualAxis, upperFold,
                 collision = CollisionSnapshot(human),
                 navelResponse=BellyShape.NavelStageResponse(state?.LastAppliedRate??0,BellyDeformSettings.Vtx), settings = BellyDeformSettings.Vtx, meshes }, options));
             Log.LogInfo("[VtxDump] Geometry snapshot written: " + path);
