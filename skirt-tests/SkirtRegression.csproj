@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../src/Skirt*.cs" />
+    <Compile Include="../src/VirtualSkinning.cs" />
+    <Compile Include="../src/VirtualAxisMath.cs" />
+    <Compile Include="../src/VirtualWeights.cs" />
+    <Compile Include="../src/SkinBounds.cs" />
+    <Compile Include="../src/MatrixBridge.cs" />
+    <Compile Include="../src/MaterialBlendField.cs" />
+    <Compile Include="../src/BellyShape.cs" />
+    <Compile Include="../src/TorsoProfile.cs" />
+    <Compile Include="../src/VtxSettings.cs" />
+    <Compile Include="../src/BreastExclusion.cs" />
+    <Compile Include="../src/RigBoneNames.cs" />
+  <Compile Include="../src/AxisPoseDriver.cs"/><Compile Include="../test-support/PhysicsGameStubs.cs"/>
+  </ItemGroup>
+<ItemGroup><Compile Include="../src/BodyProtection.cs"/></ItemGroup>
+</Project>
