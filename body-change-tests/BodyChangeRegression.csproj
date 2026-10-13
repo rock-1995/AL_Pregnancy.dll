@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../src/NativeVisualUpdate.cs" Link="NativeVisualUpdate.cs" />
+    <Compile Include="../src/MorphReadiness.cs" Link="MorphReadiness.cs" />
+    <Compile Include="../src/BodyChangeMath.cs" Link="BodyChangeMath.cs" />
+    <Compile Include="../src/BodyChangeValues.cs" Link="BodyChangeValues.cs" />
+    <Compile Include="../src/BodyChangeRuntime.cs" Link="BodyChangeRuntime.cs" />
+    <Compile Include="../src/PregnancyState.cs" Link="PregnancyState.cs" />
+    <Compile Include="../src/PregnancyGrowthSchedule.cs" Link="PregnancyGrowthSchedule.cs" />
+    <None Include="fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
