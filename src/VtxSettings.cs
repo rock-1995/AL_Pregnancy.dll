@@ -7,7 +7,7 @@ namespace ALPregnancy
     {
         // Defaults captured from the user on 2026-10-13 at 07:09:10 (0.2.39).
         // Explicit values in existing presets remain authoritative.
-        [JsonPropertyName("growthFullness")] public float GrowthFullness { get; set; } = 1.116265f;
+        [JsonPropertyName("growthFullness")] public float GrowthFullness { get; set; } = 1.10f;
         [JsonPropertyName("growthWidth")] public float GrowthWidth { get; set; } = 1.1f;
         [JsonPropertyName("upperReach")] public float UpperReach { get; set; } = 1.0762501f;
         [JsonPropertyName("lateSettle")] public float LateSettle { get; set; } = 0.502008f;
