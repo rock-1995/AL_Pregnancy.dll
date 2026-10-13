@@ -15,3 +15,5 @@ verification/
 *.alpregnancy.json*
 local.al.pregnancy.preview.cfg
 ALPregnancy_initial_cycles.json
+breast-physics-tests/asset-root-fixture.json
+*.log
