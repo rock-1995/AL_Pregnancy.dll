@@ -1,18 +1,10 @@
 # AL Pregnancy
 
-**Version 0.2.42** — a BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
+**Version 0.2.43** — a BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
 
-Pregnancy progresses with game days and drives a growing belly, clothing deformation, pose response, and optional body changes based on childbirth history. Use **F1** for global settings and **F8** for character state and manual shape preview.
+Pregnancy progresses with game days and drives a growing belly, clothing deformation, pose response, and optional body changes based on childbirth history. Use **F1** for global settings through a compatible configuration manager and **F8** for character state and manual shape preview.
 
 [Downloads](https://github.com/rock-1995/AL_Pregnancy.dll/releases) · [Changelog](CHANGELOG.md) · [Validation](VERIFICATION.txt)
-
-## Animation contact correction in 0.2.42
-
-Fixes hands separating from the chest in grabbing/supporting animations after pregnancy or postpartum body changes. Both native contact correction and the participants' animator breast parameters now use the displayed body shape. Changing pregnancy progress in F8 after entering a scene also updates the current motion; switching motions continues to use the changed shape.
-
-This is automatic when card-based body changes are active. No new setting is required. **F8 pregnancy progress** changes gameplay/body progression; **F8 manual shape preview** changes the belly only and suspends card-based body progression. Original saved character data is restored immediately after each animation read, including on exceptions.
-
-The reported grabbing/supporting case was confirmed fixed in-game. Breast protection, belly curvature, thigh protection, template cards and all 81 shape defaults remain unchanged from 0.2.40. If upgrading from 0.2.40, replacing the DLL is sufficient for this fix; keep your existing shape preset and template cards.
 
 ## Features
 
@@ -25,16 +17,6 @@ The reported grabbing/supporting case was confirmed fixed in-game. Breast protec
 - Synchronization with existing low-detail body/fluid collision meshes and Obi mesh indices.
 - Optional body changes using the difference between two character cards, applied to each character's own original body.
 - F8 character/debug controls, manual preview, unrestricted finite numeric shape input, and diagnostic export.
-
-## Install or upgrade
-
-Requires AmanatsuLocation with **BepInEx IL2CPP**. Install the release DLL at `BepInEx/plugins/AL_Pregnancy/AL_Pregnancy.dll`, or extract the release archive's `BepInEx` folder into the game directory. It replaces the previous plugin; do not load it alongside `AL_Pregnancy.Preview.dll`. A compatible configuration manager supplies the **F1** interface; **F8** is provided by this plugin.
-
-**Upgrading the DLL does not replace a saved belly preset.** Values in `BepInEx/config/ALPregnancy_belly.json` take priority over the new built-in defaults. To use the complete 0.2.42 shape, install the supplied `presets/ALPregnancy_belly.json` at that config path and restart; to retain your custom shape, leave it in place. Gameplay saves remain compatible.
-
-**Card-based body changes require `base.png` and `reference.png` beside the DLL.** Without these valid character cards, belly growth still works but template-based body changes do not. See the template section below. The release includes the default template pair beside the DLL, plus the guide, verification notes, and preset. Game dependency assemblies are not included.
-
-The stable plugin ID remains `local.al.pregnancy.preview`, so the global configuration filename remains `local.al.pregnancy.preview.cfg`. These legacy names do not indicate the installed version.
 
 ## Pregnancy gameplay and F1
 
@@ -73,10 +55,11 @@ Select a character to inspect pregnancy progress, day, recovery, cycle, concepti
 
 Manual preview does not change pregnancy, birth count, or saved gameplay state. **Default shape** resets to this version's built-in parameters; **Full-term shape** also sets growth to 1. Navel presets and **Rebuild shape** help visual checking. Optional card-based body progression is suspended while manual preview is active.
 
-### Curvature and protection
+### Shape, curvature and protection
 
 | Control / JSON key | Default | Effect |
 | --- | --- | --- |
+| Forward fullness / `growthFullness` | 1.10 | Controls how far the belly projects forward. Lower values reduce forward fullness; width has its own control. |
 | Height boundary arc / `heightBoundaryArc` | 0.8 | Above the full-term belly center, bands arch upward at the center; below it, they dip downward. 0 gives straight bands. Higher positive values increase side-to-center curvature. |
 | Breast guard × physics weight / `breastGuard` | 1 | Multiplies summed actual breast-physics-chain weights; restore amount is clamped to 0–1. |
 | Below-breast guard width / `lowerBreastGuardWidth` | 0.2078125 | Smooth protection width below the breast boundary, relative to torso span. 0 disables this transition. |
@@ -92,7 +75,7 @@ Manual preview does not change pregnancy, birth count, or saved gameplay state. 
 
 Breast ownership comes from Magica breast spring roots and descendant skin bones. At strength 1, weight 0.3 gives a base restore amount of 0.3, and weight 1 gives full protection. Fully protected vertices retain original geometry and native physics motion. Smooth transitions and seam handling share protection across body parts and nearby clothing.
 
-Breast protection is enabled by default; optional upper-bone filtering and upper-field fade are disabled. All **81** serialized shape defaults match the latest accepted export and shipped preset. Older JSON fields retained only for compatibility may be ignored by the current growth kernel; use the active F8 controls for tuning.
+Breast protection is enabled by default; optional upper-bone filtering and upper-field fade are disabled. The supplied preset contains all **81** current shape defaults. Older JSON fields retained only for compatibility may be ignored by the current growth kernel; use the active F8 controls for tuning.
 
 ## Saving settings and gameplay state
 
@@ -100,13 +83,15 @@ Breast protection is enabled by default; optional upper-bone filtering and upper
 | --- | --- | --- |
 | F1 global settings | `BepInEx/config/local.al.pregnancy.preview.cfg` | BepInEx configuration. |
 | Belly preset | `BepInEx/config/ALPregnancy_belly.json` | Loaded at startup; explicit values override defaults. |
-| F8 shape edits | Running session | Live only; 0.2.42 has no automatic preset save button. |
+| F8 shape edits | Running session | Live only; use the belly preset to retain edits across sessions. |
 | Pregnancy state | `<native-save-path>.alpregnancy.json` | Written alongside the selected native save when the game saves. |
 | Diagnostic export | `BepInEx/plugins/AL_Pregnancy/diagnostics/latest-mesh.json` | **Write diagnostic log** exports settings and mesh data. |
 
+Values in the belly preset override the built-in defaults. To set only forward fullness persistently, edit `vtx.growthFullness` in that file; the current default is `1.10`.
+
 To retain a tuned F8 shape, export diagnostics, copy the exported `settings` object into the preset's `vtx` object, preserve its wrapper (`version: 5`, `startDay: 40`), and save it at `BepInEx/config/ALPregnancy_belly.json` before restarting. The shipped preset shows the full format. `startDay` is retained for compatibility; it is not the current F1 growth schedule.
 
-Back up/move a native save and its pregnancy sidecar together. The sidecar is checked against the native save; mismatched or damaged data is not silently applied to a different save. Check the BepInEx log if state cannot load. Debug changes alone do not write a save.
+Pregnancy state belongs to its matching native save. Debug changes persist when you save through the game; a mismatched or damaged sidecar is rejected and reported in the BepInEx log.
 
 ## Optional body changes: template cards
 
@@ -119,7 +104,9 @@ BepInEx/plugins/AL_Pregnancy/
   reference.png
 ```
 
-Create a base card, edit a copy's desired body properties in the creator, and save it as the reference. Keep unrelated properties identical. The plugin applies `reference − base` to each character's own original body; it does not replace the face, outfit, or identity. Missing/unreadable templates disable this feature while belly deformation continues. The supplied pair is the author-selected template from the installed plugin; replacing it changes the body-difference target.
+Create a base card, edit a copy's desired body properties in the creator, and save it as the reference. Keep unrelated properties identical. The plugin applies `reference − base` to each character's own original body; it does not replace the face, outfit, or identity. Missing/unreadable templates disable this feature while belly deformation continues. Replacing the supplied pair changes the body-difference target.
+
+Animation contact positions and chest-size animation parameters follow these body changes automatically, including after F8 pregnancy-progress edits and motion switches. No separate contact setting is required.
 
 Supported values: 42 body-shape channels; breast softness/weight; areola size; upper-arm, belly, waist, hip, and thigh softness; nipple color.
 
@@ -137,15 +124,15 @@ Low-detail collision meshes use their own skin weights with shared deformation/p
 
 ## Troubleshooting and validation limits
 
-- **F8 missing:** check that BepInEx loaded 0.2.42, remove duplicate DLLs, and check the configured panel key.
+- **F8 missing:** check the plugin entry in the BepInEx log and the configured panel key.
 - **F1 missing:** use a compatible configuration manager; F1 is not supplied by this DLL alone.
 - **No preview character:** show a high-detail female character in the creator or scene.
-- **Old defaults:** existing belly JSON takes priority. Default shape resets the session; installing the preset updates future launches.
+- **Old defaults:** existing belly JSON takes priority. **Default shape** resets the session; edit the preset to change future launches.
 - **No template changes:** check card names/location/format, turn off manual preview, and inspect gameplay pregnancy/birth state and the log.
 - **Skipped/clipping garment:** inspect the log and compare without that outfit; readback does not support every mesh type.
 - **Unexpected pose deformation:** compare neutral/problem poses with identical settings and export diagnostics for local investigation. Review exports before public sharing because they contain character geometry.
 
-0.2.42 corrects animation contact reads and refreshes. Production build and public offline regressions are reported in `VERIFICATION.txt`. The reported grabbing/supporting pose was confirmed fixed by the user; this does not validate every motion or outfit. Earlier curved-boundary replay at arc 0.35 still found extra intersections in an extreme thigh −60° pose. That replay does not validate all poses at the new 0.8 default. Broad motion/outfit coverage remains outside these offline checks.
+See [Validation](VERIFICATION.txt) for tested coverage and [Changelog](CHANGELOG.md) for version history.
 
 ## Build and test
 
@@ -168,4 +155,4 @@ Test.ps1 runs ten offline suites: breast-physics ownership/axis driver, unrestri
 - `tests/`, `*-tests/`, `test-support/`: offline regressions and test doubles.
 - `VERIFICATION.txt`: validation scope and limitations.
 
-Prebuilt binaries belong in Releases. The selected template pair is in `templates/`; full diagnostic captures, saves, and local configuration are excluded. No source license has been selected on the author's behalf.
+Prebuilt binaries belong in Releases. The selected template pair is in `templates/`; full diagnostic captures, saves, and local configuration are excluded.
