@@ -199,7 +199,7 @@ namespace ALPregnancy
     {
         internal static int Releases;
         internal static readonly Dictionary<IntPtr, int> HumanReleases = new();
-        internal static void ReleaseHuman(Human h) => HumanReleases[h.Pointer] = HumanReleases.GetValueOrDefault(h.Pointer) + 1;
+        internal static void ReleaseMeshes(Human h) => HumanReleases[h.Pointer] = HumanReleases.GetValueOrDefault(h.Pointer) + 1;
         internal static void ReleaseVisuals() => Releases++;
     }
     internal static class PregnancyController { internal static int Releases; internal static void SuspendHuman(Human h) { } internal static void SuspendForLoading() => Releases++; }
