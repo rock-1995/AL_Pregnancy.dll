@@ -13,6 +13,7 @@ namespace Il2CppInterop.Runtime.InteropTypes.Arrays
 namespace Il2CppSystem.Collections.Generic {public class List<T>:System.Collections.Generic.List<T>{}}
 namespace UnityEngine
 {
+    public static class Mathf {public static float Clamp01(float x)=>Math.Clamp(x,0,1);}
     public class Object
     {
         static int serial;int id=++serial;public string name="test";public IntPtr Pointer=>new(id);
@@ -20,7 +21,7 @@ namespace UnityEngine
     }
     public struct Vector3 {public float x,y,z;public Vector3(float x,float y,float z){this.x=x;this.y=y;this.z=z;}}
     public struct Matrix4x4 {public NMatrix Value;public static Matrix4x4 identity=>new(){Value=NMatrix.Identity};}
-    public class Transform:Object {public Matrix4x4 localToWorldMatrix=Matrix4x4.identity;}
+    public class Transform:Object {public Transform parent;public Vector3 localScale=new(1,1,1);public Matrix4x4 localToWorldMatrix=Matrix4x4.identity;}
     public class GameObject:Object {public bool activeInHierarchy=true;public object[] Components=Array.Empty<object>();public T[] GetComponentsInChildren<T>(bool all)=>Components.OfType<T>().ToArray();}
     public class Component:Object {public GameObject gameObject=new();public Transform transform=new();public bool enabled=true;}
     public class Mesh:Object
@@ -119,7 +120,7 @@ namespace Obi
     }
     public class ObiCollider:UnityEngine.Component {public ObiShapeTracker Tracker;}
 }
-namespace Character {public class Human {public IntPtr Pointer;public UnityEngine.GameObject GameObject=new();public HumanBody Body=new();}public class HumanBody{public UnityEngine.GameObject objHitBody;}}
+
 namespace HarmonyLib
 {
     public class Harmony {public void Patch(object method,HarmonyMethod prefix=null,HarmonyMethod postfix=null){}}
@@ -133,6 +134,8 @@ namespace ALPregnancy
     internal static class BellyDeformSettings {public static VtxSettings Vtx=new();}
     internal static partial class BellyVertexMorph
     {
+        static void RuntimeLogInfo(string s)=>Log.LogInfo(s);
+        static string PathOf(UnityEngine.Transform t)=>t.name;
         static readonly Dictionary<int,CharaState> _state=new();static readonly Dictionary<int,List<MeshRecord>> _records=new();
         static class Log {public static int Errors;public static void LogInfo(string s)=>Console.WriteLine(s);public static void LogWarning(string s)=>Console.WriteLine(s);public static void LogError(string s){Errors++;Console.WriteLine(s);}}
         class CharaState {public CollisionRig Collision;public TorsoProfile Profile;public float LastAppliedRate=1;public NMatrix Frame=NMatrix.Identity;public VirtualRig Virtual;public UnityEngine.SkinnedMeshRenderer SMR;public IntPtr HumanPtr;}
@@ -145,7 +148,6 @@ namespace ALPregnancy
         static UnityEngine.Vector3 ToUnity(NVector p)=>new(p.X,p.Y,p.Z);
         static MeshRecord FindRecord(List<MeshRecord> records,UnityEngine.Mesh mesh)=>records.FirstOrDefault(r=>r.Mesh==mesh);
         static IEnumerable<(int Bone,float Weight)> Weights(UnityEngine.BoneWeight w)=>new[]{(w.boneIndex0,w.weight0),(w.boneIndex1,w.weight1),(w.boneIndex2,w.weight2),(w.boneIndex3,w.weight3)};
-        static float[] ComputeBreastWeights(UnityEngine.Mesh m,int n,UnityEngine.SkinnedMeshRenderer r)=>m.boneWeights.Select(w=>Weights(w).Where(x=>x.Weight>0&&new[]{"mune","breast","bust","chichi","nipple"}.Any(k=>r.bones[x.Bone].name.Contains(k,StringComparison.OrdinalIgnoreCase))).Sum(x=>x.Weight)).ToArray();
         static bool IsLegBoneName(string name){var s=name.ToLowerInvariant();return !new[]{"hipleg","hip_leg","hip-leg","hip leg"}.Any(s.Contains)&&(s.Contains("thigh")||(s.Contains("leg")&&!s.Contains("spine"))||s.Contains("knee"));}
         static float[] ComputeBellyInfluence(UnityEngine.Mesh m,int n,HashSet<int> belly,HashSet<int> leg)=>m.boneWeights.Select(w=>BellyShape.BoneInfluence(Weights(w).Where(x=>belly.Contains(x.Bone)).Sum(x=>x.Weight),Weights(w).Where(x=>leg.Contains(x.Bone)).Sum(x=>x.Weight))).ToArray();
         static int[] ComputeNormalWeldGroup(UnityEngine.Vector3[] v){var d=new Dictionary<UnityEngine.Vector3,int>();return v.Select((p,i)=>{if(!d.TryGetValue(p,out int g))d[p]=g=i;return g;}).ToArray();}

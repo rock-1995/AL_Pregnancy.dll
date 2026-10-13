@@ -12,5 +12,8 @@
     <Compile Include="../src/RestPoseFit.cs" Link="RestPoseFit.cs" />
     <Compile Include="../src/BreastExclusion.cs" Link="BreastExclusion.cs" />
     <Compile Include="../src/VtxSettings.cs" Link="VtxSettings.cs" />
+  <Compile Include="../src/BreastPhysicsRuntime.cs"/><Compile Include="../test-support/PhysicsGameStubs.cs"/>
   </ItemGroup>
+<ItemGroup><Compile Include="../src/BodyProtection.cs"/></ItemGroup>
+<ItemGroup><Compile Include="../src/BodyProtectionRuntime.cs"/></ItemGroup>
 </Project>
