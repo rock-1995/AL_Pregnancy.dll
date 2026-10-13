@@ -20,6 +20,7 @@ internal static class BodyChangeRuntime
         internal BodyChangeValues Original;
         internal Scope Active;
         internal bool NativeShapeDirty;
+        internal bool AnimatorParametersDirty;
     }
 
     // The saved body object and its arrays are never edited. The replacement exists
@@ -92,6 +93,28 @@ internal static class BodyChangeRuntime
     {
         var scope = BeginAfterBelly(human, record);
         End(human, scope);
+        if (human != null && Entries.TryGetValue(human.Pointer, out var entry) && entry.AnimatorParametersDirty &&
+            BodyChangeAnimation.RefreshAnimatorParameters(human)) entry.AnimatorParametersDirty = false;
+    }
+
+    // MotionIK reads Human.Data.Custom.Body, including through an inlined native
+    // GetShapeBodyValue. Supply the last committed visual body only while native
+    // contact correction runs, retaining its cover values and edition conversion.
+    // Never refresh shape/physics or recompute pregnancy inside an IK callback.
+    internal static Scope BeginAnimationRead(HumanBody body)
+    {
+        var human = body?._human;
+        if (human == null || !PregnancyPlugin.Enabled.Value || PregnancyController.ManualPreviewActive ||
+            human.Disposed || human.IsReloading || !human.HiPoly || human.Sex != 1 ||
+            human.GameObject == null || !human.GameObject.activeInHierarchy || human.Body?.Pointer != body.Pointer ||
+            !Entries.TryGetValue(human.Pointer, out var entry) || entry.BodyPointer != body.Pointer ||
+            entry.Last == null || entry.Active != null)
+            return null;
+        var owner = human.Data?.Custom;
+        if (owner?.Body == null) return null;
+        var scope = new Scope(owner, entry.Working);
+        entry.Active = scope;
+        return scope;
     }
 
     internal static Scope BeginAfterBelly(Human human, PregnancyRecord record)
@@ -121,6 +144,7 @@ internal static class BodyChangeRuntime
         bool sourceChanged = !original.Same(entry.Original);
         bool nativeChanged = entry.NativeShapeDirty;
         bool changed = !target.Same(entry.Last) || sourceChanged || nativeChanged;
+        bool shapeChanged = entry.Last == null || !target.Shape.SequenceEqual(entry.Last.Shape);
         entry.Working.Copy(owner.Body);
         target.Write(entry.Working);
         var scope = new Scope(owner, entry.Working);
@@ -146,6 +170,7 @@ internal static class BodyChangeRuntime
                 entry.NativeShapeDirty = false;
             }
             entry.Original = original;
+            entry.AnimatorParametersDirty |= shapeChanged;
             return scope;
         }
         catch { End(human, scope); Release(human); throw; }
@@ -192,6 +217,7 @@ internal static class BodyChangeRuntime
             // Also restore an inactive actor which might not receive another native tick.
             human.Body.UpdateShapeBodyValue();
             human.Body.UpdateShapeBody();
+            BodyChangeAnimation.RefreshAnimatorParameters(human);
         }
         catch (Exception ex) { PregnancyPlugin.Logger.LogWarning("[Body changes] Restore: " + ex.Message); }
     }
