@@ -12,6 +12,13 @@ internal static class PregnancyLiveRegression
         Directory.CreateDirectory(directory);
         var config = new ConfigFile(Path.Combine(directory, "test.cfg"), false) { SaveOnConfigSet = false };
         PregnancyConfig.Bind(config);
+        check("Body change F1 defaults are x=5, range 0-100 and color cap 0.85", PregnancyConfig.BodyBirths.Value == 5 && PregnancyConfig.BodyLower.Value == 0 && PregnancyConfig.BodyUpper.Value == 100 && PregnancyConfig.NippleColorMaximum.Value == .85f);
+        check("Body change integer inputs have no acceptable-value restrictions", PregnancyConfig.BodyBirths.Description.AcceptableValues == null && PregnancyConfig.BodyLower.Description.AcceptableValues == null && PregnancyConfig.BodyUpper.Description.AcceptableValues == null);
+        PregnancyConfig.BodyLower.Value = -200; PregnancyConfig.BodyUpper.Value = 300;
+        check("F1 preserves negative and above-100 body limits", PregnancyConfig.BodyLower.Value == -200 && PregnancyConfig.BodyUpper.Value == 300);
+        PregnancyConfig.NippleColorMaximum.Value = 2;
+        check("F1 color maximum alone is restricted to zero through one", PregnancyConfig.NippleColorMaximum.Value == 1);
+        PregnancyConfig.BodyLower.Value = 0; PregnancyConfig.BodyUpper.Value = 100; PregnancyConfig.NippleColorMaximum.Value = .85f;
         int notifications = 0;
         void Changed() => notifications++;
         PregnancyConfig.Changed += Changed;

@@ -27,7 +27,7 @@ internal static class StartupConfigRegression
         {
             PregnancyConfig.Bind(config);
             writer.CompleteBinding();
-            check("Actual pregnancy binding completes while configuration is write-locked", config.Count == 20);
+            check("Actual pregnancy binding completes while configuration is write-locked", config.Count == 24);
             check("Startup reads configured values instead of defaults", PregnancyConfig.Mode.Value == ConceptionMode.ComplexCycle && PregnancyConfig.Gestation.Value == 4 && PregnancyConfig.Recovery.Value == 26);
             writer.Tick(0);
             check("First failed flush retains pending work without throwing", writer.Pending && warnings.Count == 1 && !config.SaveOnConfigSet);

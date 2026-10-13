@@ -6,7 +6,7 @@ internal static class ShapeRigRegression
 {
     internal static void Run(Action<string, bool> check)
     {
-        var p = new VtxSettings();
+        var p = new VtxSettings {SagStrength=.95983934f,BellySag=0};
         var torso = new TorsoProfile
         {
             PelvicFloor=9.23f, Pubis=9.45f, Navel=10.685f, Ribs=12.19f, SampleMin=9.23f, SampleMax=12.52f,
@@ -15,22 +15,22 @@ internal static class ShapeRigRegression
         var sample=new Vector3(0,torso.Navel,.7f);
         check("Zero growth is exact identity",BellyShape.Deform(sample,torso,0,p)==sample);
         var moved=BellyShape.Deform(sample,torso,1,p);
-        check("Default sag moves the front abdomen down and forward",moved.Y<sample.Y-.1f && moved.Z>sample.Z+.5f);
-        var noSag=new VtxSettings{SagStrength=0};
+        check("Historical positive sag moves the front abdomen down and forward",moved.Y<sample.Y-.1f && moved.Z>sample.Z+.5f);
+        var noSag=new VtxSettings{BellySag=0,SagStrength=0};
         check("Sag zero preserves exact skin height",BellyShape.Deform(sample,torso,1,noSag).Y==sample.Y);
         var late=BellyShape.Growth(torso,1,p);
-        var unlifted=BellyShape.Growth(torso,1,new VtxSettings{LowerPoleLift=0});
+        var unlifted=BellyShape.Growth(torso,1,new VtxSettings{SagStrength=.95983934f,BellySag=0,LowerPoleLift=0});
         check("Lower-pole lift keeps the top fixed",late.Bottom>unlifted.Bottom && Math.Abs(late.Top-unlifted.Top)<1e-5f);
         var mid=BellyShape.Growth(torso,4f/9,p);
-        var large=BellyShape.Growth(torso,4f/9,new VtxSettings{MidVolume=1.4f});
+        var large=BellyShape.Growth(torso,4f/9,new VtxSettings{SagStrength=.95983934f,BellySag=0,MidVolume=1.4f});
         check("Mid-volume control increases the second stage",large.Depth>mid.Depth && large.HalfWidth>mid.HalfWidth);
         var high=new Vector3(0,torso.Navel+.6f,.7f);
         float broad=BellyShape.Deform(high,torso,4f/9,p).Z-high.Z;
-        float local=BellyShape.Deform(high,torso,4f/9,new VtxSettings{WallSmoothing=0}).Z-high.Z;
+        float local=BellyShape.Deform(high,torso,4f/9,new VtxSettings{SagStrength=.95983934f,BellySag=0,WallSmoothing=0}).Z-high.Z;
         check("Early smoothing reaches the future upper-abdomen domain",broad>local+.003f);
         var flank=new Vector3(.9f,torso.Navel,.5f);
-        var thin=BellyShape.Deform(flank,torso,1,new VtxSettings{GrowthWidth=.5f});
-        var wide=BellyShape.Deform(flank,torso,1,new VtxSettings{GrowthWidth=2});
+        var thin=BellyShape.Deform(flank,torso,1,new VtxSettings{SagStrength=.95983934f,BellySag=0,GrowthWidth=.5f});
+        var wide=BellyShape.Deform(flank,torso,1,new VtxSettings{SagStrength=.95983934f,BellySag=0,GrowthWidth=2});
         check("Width changes transverse expansion",wide.X>thin.X+.05f);
         var back=new Vector3(0,torso.Navel,-1);
         check("Back skin remains fixed",BellyShape.Deform(back,torso,1,p)==back);
@@ -44,14 +44,14 @@ internal static class ShapeRigRegression
         p.SagStrength=.5f;BellyShape.Deform(sample,torso,1,p);
         check("Changing sag invalidates the field",BellyShape.FieldBuildCount==buildCount+1);
         bool ordered=true;
-        var strong=new VtxSettings{SagStrength=2};
+        var strong=new VtxSettings{BellySag=0,SagStrength=2};
         float prior=float.NegativeInfinity;
         for(float y=8.5f;y<13.5f;y+=.01f)
         {
             var v=BellyShape.Deform(new Vector3(0,y,.7f),torso,1,strong);
             ordered &= v.Y>prior && float.IsFinite(v.X+v.Y+v.Z);prior=v.Y;
         }
-        check("Maximum sag preserves vertical row ordering",ordered);
+        check("Recommended positive sag preserves vertical row ordering",ordered);
         check("Pure breast guard remains fixed",BellyShape.BreastRestore(1,1)==1);
         check("No waist weighting leaves legs unchanged",BellyShape.BoneInfluence(0,1)==0);
         check("Torso weights retain full influence",BellyShape.BoneInfluence(1,0)==1);
@@ -64,7 +64,7 @@ internal static class ShapeRigRegression
         foreach(var control in controls)
         foreach(float value in new[]{0f,1f})
         {
-            var setting=new VtxSettings();control(setting,value);
+            var setting=new VtxSettings {SagStrength=.95983934f,BellySag=0};control(setting,value);
             foreach(float stage in new[]{4f/9,1f})
             for(float y=8.8f;y<12.8f;y+=.13f)
             foreach(float x in new[]{0f,.4f,.9f})
@@ -73,9 +73,9 @@ internal static class ShapeRigRegression
                 sliderFinite &= float.IsFinite(o.X+o.Y+o.Z) && o.Y<=v.Y+1e-6f && o.Z>=v.Z-1e-6f;
             }
         }
-        check("Every new slider endpoint produces finite outward/downward geometry",sliderFinite);
+        check("Historical positive-sag slider endpoints produces finite outward/downward geometry",sliderFinite);
         var watch=System.Diagnostics.Stopwatch.StartNew();
-        var timed=new VtxSettings{WallSmoothing=.9876f};BellyShape.Deform(sample,torso,1,timed);watch.Stop();
+        var timed=new VtxSettings{SagStrength=.95983934f,BellySag=0,WallSmoothing=.9876f};BellyShape.Deform(sample,torso,1,timed);watch.Stop();
         Console.WriteLine($"PERFORMANCE: one field rebuild {watch.Elapsed.TotalMilliseconds:F2} ms; cached sampling reuses this field.");
         Vector3 offset = new(.15f,.05f,.2f);
         check("Unchanged surface preserves full garment gap exactly", SurfaceAttachment.RotateOffset(offset,Vector3.UnitZ,Vector3.UnitZ) == offset);

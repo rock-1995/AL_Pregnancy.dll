@@ -62,12 +62,13 @@ internal static class GrowthScheduleRegression
         float z100 = BellyShape.Deform(sample, torso, 1, settings).Z;
         check("Actual skin surface still expands at 90, 95, 99 and 100 percent", z95 > z90 && z99 > z95 && z100 > z99);
         bool same = true;
+        var historical=new VtxSettings {SagStrength=.95983934f,BellySag=0,HeightBoundaryArc=0};
         foreach (float stage in stages) for (int i=0;i<21;i++)
         {
             var v = new Vector3((i%3-1)*.3f, torso.Pubis+i*.13f, .7f);
-            same &= Vector3.Distance(BellyShape.Deform(v,torso,stage,settings), AcceptedBellyShape024.Deform(v,torso,stage,settings)) < 1e-5f;
+            same &= Vector3.Distance(BellyShape.Deform(v,torso,stage,historical), AcceptedBellyShape024.Deform(v,torso,stage,historical)) < 1e-5f;
         }
-        check("Approved landmark and full-term shapes match the defaults-only backup", same);
+        check("Historical positive-sag landmark/full-term shapes match their backup", same);
 
         var world = new PregnancyWorld(); var p = world.Register("daily", "Daily", 1); p.Pregnant = true; p.GestationVariationSample = 0;
         rules.GestationDays = 4; rules.GestationVariation = .1;

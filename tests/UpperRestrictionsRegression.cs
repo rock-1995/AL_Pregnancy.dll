@@ -9,12 +9,13 @@ internal static class UpperRestrictionsRegression
         var t = new TorsoProfile { PelvicFloor=-1.45f, Pubis=-1.23f, Navel=0, Ribs=1.5f,
             SampleMin=-1.6f, SampleMax=2, Front=new[]{.6f,.65f,.7f}, Back=new[]{-.4f,-.4f,-.4f}, Width=new[]{.8f,.9f,1f} };
         var p = JsonSerializer.Deserialize<VtxSettings>("{\"breastBoundaryRings\":99,\"breastBoundarySmoothing\":1}")!;
-        check("Old presets default all additional restrictions to off", !p.BreastExclusionEnabled && !p.UpperBoneFilterEnabled && !p.UpperFieldFadeEnabled);
+        check("Missing switches receive the exported breast-on and upper-filters-off defaults", p.BreastExclusionEnabled && !p.UpperBoneFilterEnabled && !p.UpperFieldFadeEnabled);
         check("Removed ring controls cannot survive serialization", !JsonSerializer.Serialize(p).Contains("breastBoundary"));
         var weights=new[]{0f,.01f,.9f};var welds=new[]{0,1,1};
-        check("Disabled breast exclusion clears both owned vertices and welded duplicates", !BreastExclusion.Build(weights,3,welds,p.BreastExclusionEnabled).Any(x=>x));
+        p.BreastExclusionEnabled=false;
+        check("Disabled breast exclusion clears both owned vertices and welded duplicates", !BreastExclusion.BuildFullyProtected(weights,3,welds,p.BreastExclusionEnabled).Any(x=>x));
         p.BreastExclusionEnabled=true;
-        check("Reenabled breast exclusion retains original ownership semantics", BreastExclusion.Build(weights,3,welds,p.BreastExclusionEnabled).SequenceEqual(new[]{false,true,true}));
+        check("Reenabled guard only fully excludes vertices reaching full protection", !BreastExclusion.BuildFullyProtected(weights,3,welds,p.BreastExclusionEnabled).Any(x=>x));
         foreach (float native in new[]{0f,.2f,1f})
         {
             check($"Upper filter off releases native weight {native}", BellyShape.DeformationInfluence(native,.1f,t,p)==1);

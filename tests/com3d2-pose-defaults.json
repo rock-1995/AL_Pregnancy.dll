@@ -1,0 +1,17 @@
+{
+  "sagStrength": -0.8,
+  "bellySag": 2,
+  "axisBlendStart": 0.02,
+  "axisBlendFull": 0.25,
+  "lowerTransitionStart": -0.39976415,
+  "lowerTransitionWidth": 0.34,
+  "lowerTransitionBias": 0,
+  "upperTransitionStart": 0.28,
+  "upperTransitionWidth": 0.599433959,
+  "upperTransitionBias": -0.886792481,
+  "upperTransitionJoin": 0.422169805,
+  "upperTransitionActivation": 0.02,
+  "axisPullLow": 0.6,
+  "axisPullHigh": 0.9,
+  "axisPullAngle": 35
+}
