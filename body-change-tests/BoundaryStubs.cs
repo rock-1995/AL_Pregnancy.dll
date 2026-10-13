@@ -11,9 +11,17 @@ namespace Character { public class BodyEntry { public UnityEngine.SkinnedMeshRen
 namespace Manager { public static class Scene { public static bool IsNowLoading; } public static class MapManager { public static bool IsLoading; } }
 namespace HarmonyLib
 {
-    public class Harmony { public void Patch(System.Reflection.MethodInfo method,HarmonyMethod prefix) {} }
-    public class HarmonyMethod { public HarmonyMethod(Type type,string name) {} }
-    public static class AccessTools { public static List<System.Reflection.MethodInfo> GetDeclaredMethods(Type t)=>t.GetMethods().ToList(); }
+    public class Harmony
+    {
+        public readonly List<(System.Reflection.MethodInfo Method,HarmonyMethod Prefix,HarmonyMethod Finalizer)> Patches=new();
+        public void Patch(System.Reflection.MethodInfo method,HarmonyMethod prefix,HarmonyMethod finalizer=null)=>Patches.Add((method,prefix,finalizer));
+    }
+    public class HarmonyMethod { public System.Reflection.MethodInfo Method; public HarmonyMethod(Type type,string name)=>Method=type.GetMethod(name,System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.Public|System.Reflection.BindingFlags.NonPublic); }
+    public static class AccessTools
+    {
+        public static List<System.Reflection.MethodInfo> GetDeclaredMethods(Type t)=>t.GetMethods(System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.Public|System.Reflection.BindingFlags.DeclaredOnly).ToList();
+        public static System.Reflection.MethodInfo Method(Type t,string name)=>t.GetMethod(name);
+    }
 }
 namespace ALPregnancy
 {

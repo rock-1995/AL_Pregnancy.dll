@@ -6,6 +6,7 @@
     <Compile Include="../src/BodyChangeMath.cs" Link="BodyChangeMath.cs" />
     <Compile Include="../src/BodyChangeValues.cs" Link="BodyChangeValues.cs" />
     <Compile Include="../src/BodyChangeRuntime.cs" Link="BodyChangeRuntime.cs" />
+    <Compile Include="../src/BodyChangeAnimation.cs" Link="BodyChangeAnimation.cs" />
     <Compile Include="../src/PregnancyState.cs" Link="PregnancyState.cs" />
     <Compile Include="../src/PregnancyGrowthSchedule.cs" Link="PregnancyGrowthSchedule.cs" />
     <None Include="fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
