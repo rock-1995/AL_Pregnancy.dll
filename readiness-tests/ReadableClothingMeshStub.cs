@@ -1,4 +1,5 @@
 namespace ALPregnancy;
+internal static class BodyChangeRuntime { internal static void Release(Character.Human human) { } }
 // GPU copying is exercised separately by clothing-runtime-tests. These suites
 // exercise ownership and readiness with controllable success/failure results.
 internal static class ReadableClothingMesh
