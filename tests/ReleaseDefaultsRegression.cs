@@ -9,11 +9,12 @@ internal static class ReleaseDefaultsRegression
         using var defaults=JsonDocument.Parse(JsonSerializer.Serialize(new VtxSettings()));
         using var preset=JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"release-defaults.json")));
         var release=preset.RootElement.GetProperty("vtx");
-        check("All 81 exported parameters become code and file defaults", capture.RootElement.EnumerateObject().Count()==81 && defaults.RootElement.EnumerateObject().Count()==81 && release.EnumerateObject().Count()==81);
+        check("Code and preset retain all 81 parameters", capture.RootElement.EnumerateObject().Count()==81 && defaults.RootElement.EnumerateObject().Count()==81 && release.EnumerateObject().Count()==81);
         foreach(var field in capture.RootElement.EnumerateObject())
         {
-            bool Equal(JsonElement item)=>item.ValueKind==field.Value.ValueKind && (item.ValueKind==JsonValueKind.Number ? item.GetSingle()==field.Value.GetSingle() : item.GetRawText()==field.Value.GetRawText());
-            check("Code and preset match the 07:09:10 user export: "+field.Name, defaults.RootElement.TryGetProperty(field.Name,out var code)&&Equal(code)&&release.TryGetProperty(field.Name,out var file)&&Equal(file));
+            // The requested fullness change is the only override of the accepted export.
+            bool Equal(JsonElement item)=>item.ValueKind==field.Value.ValueKind && (item.ValueKind==JsonValueKind.Number ? item.GetSingle()==(field.Name=="growthFullness" ? 1.10f : field.Value.GetSingle()) : item.GetRawText()==field.Value.GetRawText());
+            check("Code and preset match 1.10 fullness and the other 80 accepted defaults: "+field.Name, defaults.RootElement.TryGetProperty(field.Name,out var code)&&Equal(code)&&release.TryGetProperty(field.Name,out var file)&&Equal(file));
         }
         check("Default preset preserves format and start day",preset.RootElement.GetProperty("version").GetInt32()==5 && preset.RootElement.GetProperty("startDay").GetInt32()==40);
         using var oldPreset=JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"previous-defaults-0.2.34.json")));
