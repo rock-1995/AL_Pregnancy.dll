@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../src/BellyShape.cs" />
+    <Compile Include="../src/VirtualAxisMath.cs" />
+    <Compile Include="../src/TorsoProfile.cs" />
+    <Compile Include="../src/VtxSettings.cs" />
+    <Compile Include="../src/ShapeInput.cs" />
+    <Compile Include="../src/SkinSurfaceShading.cs" />
+    <Compile Include="../src/VirtualWeights.cs" />
+  </ItemGroup>
+</Project>
