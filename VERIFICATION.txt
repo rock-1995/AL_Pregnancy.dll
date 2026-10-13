@@ -1,35 +1,27 @@
-AL Pregnancy 0.2.42 - release verification, 2026-10-14
+AL Pregnancy 0.2.43 - verification, 2026-10-14
 
-The reported grabbing/supporting hand/chest separation was confirmed fixed
-in-game by the user. This is confirmation of that reported case, not of every
-motion, character, outfit or third-party plugin combination.
+Production build: 0 warnings, 0 errors. Assembly version: 0.2.43.0.
+DLL SHA-256: D6582F071A4CE80EF379720F320B99EB1F317F24652AAE83E61D5CA1B63773E7
+Main regression suite: 587 checks passed.
 
-The release DLL is identical to the installed and user-tested 0.2.42 build.
-DLL SHA-256: FD2CDF3EC24087ABE2EBA4867B1612DE6FB864F8B4CD611788B284F20FDF397E
-Original production build: 0 warnings, 0 errors. Version: 0.2.42.0.
-Runtime source is byte-identical to the tested local 0.2.42 source.
+Forward fullness (growthFullness) changes from 1.116265 to 1.10 in both
+VtxSettings and presets/ALPregnancy_belly.json. Checks compare all 81 fields:
+this one requested override and the other 80 accepted values. The historical
+0.2.40 fixture is retained unchanged. Explicitly saved settings retain their
+values; the current preset format remains version 5 / startDay 40.
 
-Body/animation suite rerun for publication: 923 checks passed, including native
-update ordering, original-data restoration, seven MotionIK readers, two HActor
-readers and eight native animator parameter readers. Coverage includes live
-progress changes after scene entry, switching motion controllers, multiple
-actors, nested reads, exceptions/retries, deferred scene readiness and removal
-of body changes. Native APIs in this suite are managed test doubles.
+Runtime-source comparison against 0.2.42 confirms that the only behavioral
+change is the default value. The other source edits synchronize the assembly,
+plugin, F8 and diagnostic version labels. Animation contact, deformation,
+protection, curvature, collision and virtual skinning algorithms are unchanged.
+The two supplied template cards are also byte-identical to 0.2.42.
 
-The 0.2.40 public release passed all ten suites (13,008 checks). This publication
-reruns the changed body/animation suite; it does not present the unchanged
-suites or historical geometry replays as new 0.2.42 live validation.
+The 0.2.42 body/animation suite previously passed 923 checks, and the user
+confirmed that release fixed the reported grabbing/supporting contact case.
+Those unchanged tests are not presented as newly rerun in 0.2.43. The new
+fullness setting has not been visually validated in every live pose or outfit.
 
-Relative to 0.2.40, production changes are limited to animation parameter
-reads/refresh, registration of those hooks, and version labels. Deformation,
-protection, curvature, virtual skinning and all 81 accepted defaults are unchanged.
-No runtime code was changed during this publication.
-
-The author-selected template cards are unchanged from the 0.2.40 release.
-Body-change numerical fixtures remain historical regression inputs; they are
-not the newly selected reference card. No full game mesh captures, game native
-assemblies, saves or local user configuration are included.
-
-Earlier local geometry replay at arc 0.35 retained extra intersections in an
-extreme thigh -60 degree pose; that is not a full-pose validation of arc 0.8.
-Optional full-mesh replay remains local-only and requires a supplied fixture.
+Historical local geometry replay at arc 0.35 retained extra intersections in
+an extreme thigh -60 degree pose; it is not a full-pose validation of arc 0.8.
+Optional full-mesh replay needs a separately supplied local fixture. No game
+native assemblies, full mesh captures, saves or local configuration are included.

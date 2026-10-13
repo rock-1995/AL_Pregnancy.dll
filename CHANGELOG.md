@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.43
+
+- Set Forward fullness (`growthFullness`) to **1.10**, previously 1.116265, in both built-in defaults and the supplied preset. The other 80 shape defaults are unchanged.
+- Retain the 0.2.42 animation contact correction without runtime algorithm changes.
+- Keep the README focused on current features, controls and saved settings; move release-specific discussion to the changelog and validation file.
+
 ## 0.2.42
 
 - Fix hand/chest separation in grabbing and supporting animations when pregnancy or postpartum body changes alter chest size. The reported case was confirmed fixed in-game.
