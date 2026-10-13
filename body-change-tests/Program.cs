@@ -97,6 +97,7 @@ Check("world change restores original rendered values",human.Body.Applied.Same(B
 Tick();BodyChangeRuntime.Release(human);human.Body=new HumanBody(human);Tick();
 Check("body reload reapplies color and auxiliary settings",human.Body.ExtraCalls==9);
 BoundaryOrderRegression.Run(Check);
+AnimationContactRegression.Run(Check);
 BodyChangeRuntime.ReleaseAll();human.Body.ThrowExtra=true;
 try {BodyChangeRuntime.BeginAfterBelly(human,pregnancy);throw new Exception("expected failure");}catch(InvalidOperationException){}
 Check("native preparation failure cannot leak temporary data",ReferenceEquals(human.Data.Custom.Body,originalBody));
