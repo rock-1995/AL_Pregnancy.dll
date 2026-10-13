@@ -1,0 +1,12 @@
+{
+  "axisBlendStart": 0.103984065,
+  "axisBlendFull": 0.13217132,
+  "lowerTransitionStart": -0.03934264,
+  "lowerTransitionWidth": 0.7216733,
+  "lowerTransitionBias": 1.3625498,
+  "upperTransitionStart": 0.22609562,
+  "upperTransitionWidth": 0.40326697,
+  "upperTransitionBias": -0.3187251,
+  "upperTransitionJoin": 0.10394423,
+  "upperTransitionActivation": 0.025932271
+}

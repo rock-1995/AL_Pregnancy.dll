@@ -27,15 +27,15 @@ internal static class LowerTransitionRegression
         check("All biases retain the original endpoints",endpoints);
         const float e=1e-5f;
         check("Extreme biases retain smooth zero-slope endpoints",new[]{-2f,0f,2f}.All(b=>VirtualAxisMath.LowerAttachment(e,b)/e<.001f && (1-VirtualAxisMath.LowerAttachment(1-e,b))/e<.001f));
-        check("Out of range bias clamps to supported range",VirtualAxisMath.LowerAttachment(.4f,-99)==VirtualAxisMath.LowerAttachment(.4f,-2) && VirtualAxisMath.LowerAttachment(.4f,99)==VirtualAxisMath.LowerAttachment(.4f,2));
+        check("Out of range bias remains effective without clamping",VirtualAxisMath.LowerAttachment(.4f,-99)>VirtualAxisMath.LowerAttachment(.4f,-2) && VirtualAxisMath.LowerAttachment(.4f,99)<VirtualAxisMath.LowerAttachment(.4f,2));
         check("Invalid bias falls back to original curve",new[]{float.NaN,float.NegativeInfinity,float.PositiveInfinity}.All(b=>VirtualAxisMath.LowerAttachment(.4f,b)==VirtualAxisMath.LowerAttachment(.4f,0)));
         var legacy=JsonSerializer.Deserialize<VtxSettings>("{\"virtualAxisStrength\":0.7}")!;
-        check("Existing settings without the field preserve the old transition",legacy.LowerTransitionBias==0 && legacy.VirtualAxisStrength==.7f);
+        check("Missing bias receives the COM default; explicit strength is preserved",legacy.LowerTransitionBias==new VtxSettings().LowerTransitionBias && legacy.VirtualAxisStrength==.7f);
         legacy.LowerTransitionBias=1.25f;
         var saved=JsonSerializer.Serialize(legacy);
         check("New parameter survives JSON save/load",saved.Contains("\"lowerTransitionBias\":1.25") && JsonSerializer.Deserialize<VtxSettings>(saved)!.LowerTransitionBias==1.25f);
         var torso=new TorsoProfile {PelvicFloor=-1.4f,Navel=0,Ribs=1.3f};
-        var p=new VtxSettings(); bool top=true, floor=true, unmoved=true, disabled=true;
+        var p=new VtxSettings {LowerTransitionStart=.02f,LowerTransitionWidth=.6f}; bool top=true, floor=true, unmoved=true, disabled=true;
         foreach(float b in new[]{-2f,-1f,0f,1f,2f})
         {
             p.LowerTransitionBias=b; p.VirtualAxisStrength=1;
@@ -49,14 +49,14 @@ internal static class LowerTransitionRegression
         check("Bias retains pelvic-floor native attachment",floor);
         check("Bias cannot affect unmoved skin",unmoved);
         check("Disabling virtual skinning still cancels the biased transition",disabled);
-        p=new VtxSettings();bool unchanged=true;
+        p=new VtxSettings {LowerTransitionStart=.02f,LowerTransitionWidth=.6f};bool unchanged=true;
         foreach(float bias in new[]{-2f,0f,2f})for(int i=0;i<=1000;i++)
         {
             p.LowerTransitionBias=bias;float y=torso.PelvicFloor+torso.Span*i/1000;
             float old=VirtualAxisMath.Weight(.2f*torso.Span,torso.Span,p)*VirtualAxisMath.LowerAttachment(Math.Clamp((y-torso.PelvicFloor-.02f*torso.Span)/MathF.Max(torso.Span*.6f,1e-5f),0,1),bias);
             unchanged &= MathF.Abs(old-VirtualAxisMath.SurfaceWeight(.2f*torso.Span,y,torso,p))<2e-6f;
         }
-        check("Default lower start/width preserve the full prior lower curve",unchanged);
+        check("Explicit old lower start/width preserve the full prior lower curve",unchanged);
         p.LowerTransitionStart=.20f;p.LowerTransitionWidth=.3f;p.LowerTransitionBias=0;
         check("Lower height slider moves the native attachment endpoint",VirtualAxisMath.SurfaceWeight(torso.Span,torso.PelvicFloor+.20f*torso.Span,torso,p)==0);
         check("Lower width slider moves the full-attachment endpoint",VirtualAxisMath.SurfaceWeight(torso.Span,torso.PelvicFloor+.50f*torso.Span,torso,p)>.999f);

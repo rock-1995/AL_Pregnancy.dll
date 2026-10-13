@@ -50,7 +50,7 @@ internal static class UpperTransitionRegression
         check("A wider upper band retains support beyond the former exit",Evaluate(end)>.01f);
         p.UpperTransitionStart=.8f;
         check("Moving upper start leaves the old upper region on the lower formula",Evaluate(ymid)==VirtualAxisMath.SurfaceWeight(.5f,ymid,t,p));
-        p.UpperTransitionStart=.15f;p.UpperTransitionWidth=.55f;
+        p.UpperTransitionStart=.15f;p.UpperTransitionWidth=.55f;p.UpperTransitionJoin=.2f;p.UpperTransitionActivation=.02f;
         float before=Evaluate(ymid);p.UpperFoldSupport=4;
         check("Legacy geometric-support setting cannot alter new material weights",Evaluate(ymid)==before);
         p.UpperTransitionWidth=float.NaN;p.UpperTransitionJoin=float.NaN;p.UpperTransitionActivation=float.NaN;
@@ -60,7 +60,7 @@ internal static class UpperTransitionRegression
         string json=JsonSerializer.Serialize(p);
         check("All eight band controls round-trip through existing settings JSON",JsonSerializer.Serialize(JsonSerializer.Deserialize<VtxSettings>(json))==json);
         var old=JsonSerializer.Deserialize<VtxSettings>("{\"lowerTransitionBias\":1.25,\"upperFoldSupport\":4}")!;
-        check("Old files keep lower bias and receive the original lower start/width",old.LowerTransitionBias==1.25f&&old.LowerTransitionStart==.02f&&old.LowerTransitionWidth==.6f);
+        check("Old files keep explicit bias and receive selected SVS defaults for missing start/width",old.LowerTransitionBias==1.25f&&old.LowerTransitionStart==new VtxSettings().LowerTransitionStart&&old.LowerTransitionWidth==new VtxSettings().LowerTransitionWidth);
         check("New presets retire per-pose geometric support",new VtxSettings().UpperFoldSupport==0);
     }
 }

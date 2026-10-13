@@ -11,6 +11,8 @@ void Check(string name, bool condition)
 }
 
 if(args.Length>1 && args[0]=="--clothing-replay") { SupplementalClothingReplay.Run(args[1],Check);return; }
+if(args.Length>1 && args[0]=="--sag-replay") { SagRegression.Run(Check,args[1]);Console.WriteLine($"{passed} sag checks passed.");return; }
+SagRegression.Run(Check);
 SupplementalClothingRegression.Run(Check);
 ReleaseDefaultsRegression.Run(Check);
 StartupConfigRegression.Run(Check);

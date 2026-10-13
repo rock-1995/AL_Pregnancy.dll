@@ -16,6 +16,12 @@
     <Compile Include="../src/TorsoSelectionPolicy.cs" Link="TorsoSelectionPolicy.cs" />
     <Compile Include="../src/RestSpaceMapping.cs" Link="RestSpaceMapping.cs" />
     <Compile Include="../src/SkinSurfaceShading.cs" Link="SkinSurfaceShading.cs" />
+    <Compile Include="../src/SagInput.cs" Link="SagInput.cs" />
+    <Compile Include="../src/ShapeInput.cs" Link="ShapeInput.cs" />
+    <None Include="com3d2-pose-defaults.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="previous-defaults-0.2.34.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="svs-binding-defaults.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="previous-defaults-0.2.31.json" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../src/BellyShape.cs" Link="BellyShape.cs" />
     <Compile Include="../src/VirtualAxisMath.cs" Link="VirtualAxisMath.cs" />
     <Compile Include="../src/UpperFoldSupport.cs" Link="UpperFoldSupport.cs" />
@@ -35,4 +41,5 @@
     <None Include="user-trace-0.1.3-bones.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 <ItemGroup><Compile Include="../src/SupplementalClothing.cs" Link="SupplementalClothing.cs"/></ItemGroup>
+<ItemGroup><None Include="user-defaults-0.2.40.json" CopyToOutputDirectory="PreserveNewest"/></ItemGroup>
 </Project>
