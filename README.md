@@ -1,10 +1,18 @@
 # AL Pregnancy
 
-**Version 0.2.40** — a BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
+**Version 0.2.42** — a BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
 
 Pregnancy progresses with game days and drives a growing belly, clothing deformation, pose response, and optional body changes based on childbirth history. Use **F1** for global settings and **F8** for character state and manual shape preview.
 
 [Downloads](https://github.com/rock-1995/AL_Pregnancy.dll/releases) · [Changelog](CHANGELOG.md) · [Validation](VERIFICATION.txt)
+
+## Animation contact correction in 0.2.42
+
+Fixes hands separating from the chest in grabbing/supporting animations after pregnancy or postpartum body changes. Both native contact correction and the participants' animator breast parameters now use the displayed body shape. Changing pregnancy progress in F8 after entering a scene also updates the current motion; switching motions continues to use the changed shape.
+
+This is automatic when card-based body changes are active. No new setting is required. **F8 pregnancy progress** changes gameplay/body progression; **F8 manual shape preview** changes the belly only and suspends card-based body progression. Original saved character data is restored immediately after each animation read, including on exceptions.
+
+The reported grabbing/supporting case was confirmed fixed in-game. Breast protection, belly curvature, thigh protection, template cards and all 81 shape defaults remain unchanged from 0.2.40. If upgrading from 0.2.40, replacing the DLL is sufficient for this fix; keep your existing shape preset and template cards.
 
 ## Features
 
@@ -22,7 +30,7 @@ Pregnancy progresses with game days and drives a growing belly, clothing deforma
 
 Requires AmanatsuLocation with **BepInEx IL2CPP**. Install the release DLL at `BepInEx/plugins/AL_Pregnancy/AL_Pregnancy.dll`, or extract the release archive's `BepInEx` folder into the game directory. It replaces the previous plugin; do not load it alongside `AL_Pregnancy.Preview.dll`. A compatible configuration manager supplies the **F1** interface; **F8** is provided by this plugin.
 
-**Upgrading the DLL does not replace a saved belly preset.** Values in `BepInEx/config/ALPregnancy_belly.json` take priority over the new built-in defaults. To use the complete 0.2.40 shape, install the supplied `presets/ALPregnancy_belly.json` at that config path and restart; to retain your custom shape, leave it in place. Gameplay saves remain compatible.
+**Upgrading the DLL does not replace a saved belly preset.** Values in `BepInEx/config/ALPregnancy_belly.json` take priority over the new built-in defaults. To use the complete 0.2.42 shape, install the supplied `presets/ALPregnancy_belly.json` at that config path and restart; to retain your custom shape, leave it in place. Gameplay saves remain compatible.
 
 **Card-based body changes require `base.png` and `reference.png` beside the DLL.** Without these valid character cards, belly growth still works but template-based body changes do not. See the template section below. The release includes the default template pair beside the DLL, plus the guide, verification notes, and preset. Game dependency assemblies are not included.
 
@@ -92,7 +100,7 @@ Breast protection is enabled by default; optional upper-bone filtering and upper
 | --- | --- | --- |
 | F1 global settings | `BepInEx/config/local.al.pregnancy.preview.cfg` | BepInEx configuration. |
 | Belly preset | `BepInEx/config/ALPregnancy_belly.json` | Loaded at startup; explicit values override defaults. |
-| F8 shape edits | Running session | Live only; 0.2.40 has no automatic preset save button. |
+| F8 shape edits | Running session | Live only; 0.2.42 has no automatic preset save button. |
 | Pregnancy state | `<native-save-path>.alpregnancy.json` | Written alongside the selected native save when the game saves. |
 | Diagnostic export | `BepInEx/plugins/AL_Pregnancy/diagnostics/latest-mesh.json` | **Write diagnostic log** exports settings and mesh data. |
 
@@ -129,7 +137,7 @@ Low-detail collision meshes use their own skin weights with shared deformation/p
 
 ## Troubleshooting and validation limits
 
-- **F8 missing:** check that BepInEx loaded 0.2.40, remove duplicate DLLs, and check the configured panel key.
+- **F8 missing:** check that BepInEx loaded 0.2.42, remove duplicate DLLs, and check the configured panel key.
 - **F1 missing:** use a compatible configuration manager; F1 is not supplied by this DLL alone.
 - **No preview character:** show a high-detail female character in the creator or scene.
 - **Old defaults:** existing belly JSON takes priority. Default shape resets the session; installing the preset updates future launches.
@@ -137,7 +145,7 @@ Low-detail collision meshes use their own skin weights with shared deformation/p
 - **Skipped/clipping garment:** inspect the log and compare without that outfit; readback does not support every mesh type.
 - **Unexpected pose deformation:** compare neutral/problem poses with identical settings and export diagnostics for local investigation. Review exports before public sharing because they contain character geometry.
 
-0.2.40 changes defaults only relative to 0.2.39. Production build and public offline regressions are reported in `VERIFICATION.txt`. Earlier curved-boundary replay at arc 0.35 still found extra intersections in an extreme thigh −60° pose. That replay does not validate all poses at the new 0.8 default. Continuous in-game animation and broad outfit/performance coverage remain outside these offline checks.
+0.2.42 corrects animation contact reads and refreshes. Production build and public offline regressions are reported in `VERIFICATION.txt`. The reported grabbing/supporting pose was confirmed fixed by the user; this does not validate every motion or outfit. Earlier curved-boundary replay at arc 0.35 still found extra intersections in an extreme thigh −60° pose. That replay does not validate all poses at the new 0.8 default. Broad motion/outfit coverage remains outside these offline checks.
 
 ## Build and test
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.42
+
+- Fix hand/chest separation in grabbing and supporting animations when pregnancy or postpartum body changes alter chest size. The reported case was confirmed fixed in-game.
+- Supply the committed visual body during native MotionIK/HActor contact reads and eight motion controllers' animator parameter reads. The latter use an inlined getter that bypassed the initial 0.2.41 correction.
+- Refresh native animation parameters after live body changes, including F8 pregnancy-progress edits made after scene entry. Refresh the original values when body changes are removed; defer refresh until the scene is ready.
+- Restore original character-data references after every scoped read, including exceptions and nested/multiple-actor calls. Retain native cover handling.
+- Add animation regression coverage: 923 body/animation checks pass. Keep deformation, breast/thigh protection, curvature, template cards and all 81 defaults unchanged from 0.2.40.
+- Synchronize F8 and diagnostic version labels. No new setting or preset migration is required.
+
+## 0.2.41 (local candidate)
+
+- Scoped native IK and actor shape reads to the visual body. This did not resolve the reported pose because the separate animator parameter path was still reading the original card; 0.2.42 completes the correction.
+
 ## 0.2.40
 
 - Make all 81 accepted shape settings the built-in defaults and ship the matching preset.
