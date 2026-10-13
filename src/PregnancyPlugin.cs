@@ -9,7 +9,7 @@ using UnityEngine;
 namespace ALPregnancy;
 
 // Preserve the legacy ID so existing configuration and plugin references remain valid.
-[BepInPlugin("local.al.pregnancy.preview", "AL Pregnancy", "0.2.42")]
+[BepInPlugin("local.al.pregnancy.preview", "AL Pregnancy", "0.2.43")]
 [BepInDependency(PatchCompatibility.UncensorGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInProcess("AmanatsuLocation.exe")]
 public sealed class PregnancyPlugin : BasePlugin
@@ -55,7 +55,7 @@ public sealed class PregnancyPlugin : BasePlugin
         BodyChangeAnimation.Install(_harmony);
         MorphReadiness.Install(_harmony);
         BellyVertexMorph.InstallCollisionSync(_harmony);
-        Log.LogInfo("AL Pregnancy 0.2.42 loaded. Native IK and eight animator parameter readers use the visual body; live body changes refresh motion parameters.");
+        Log.LogInfo("AL Pregnancy 0.2.43 loaded. Native IK and eight animator parameter readers use the visual body; live body changes refresh motion parameters.");
     }
 
     internal static void TickStartupConfig() => _startupConfig?.Tick(Time.unscaledTime);
