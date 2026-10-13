@@ -1,27 +1,57 @@
-Release validation: 0.2.27 (2026-10-06)
+AL Pregnancy 0.2.40 — release verification, 2026-10-13
 
-Production Release build against E:/as active IL2CPP interop: 0 warnings, 0 errors.
-Six offline suites: 435 main + 46 collision + 67 native completion + 28 mesh lifetime + 25 source lifetime + 30 clothing buffer = 631 checks passed.
-The main suite retains the pre-existing CS0649 CollisionSurfaceMap helper-field warning.
-Deliberately injected collision/readback failures are expected recovery tests.
+Runtime source is byte-identical to the accepted local 0.2.40 source.
+Production build: succeeded, 0 warnings, 0 errors.
+Public source was separately rebuilt using local game/BepInEx interop assemblies.
+The release uses the already-verified 0.2.40 DLL; a rebuild in another directory
+can differ in binary hash because of build-path/debug metadata.
 
-User card: ALCoorde_F_20261003163508192.png, coordinate name Jirai night.
-Decoded Clothes.parts[10].id = 1: category 115, heart chain, prefab p_cf_add_etc00.
-Actual waist mesh: o_add_etc00_waist00, 302 vertices, 8 bones, Read/Write disabled in the native asset.
-The old clothing name filter excluded this supplemental garment. The old lease also skipped unreadable meshes.
-Free accessories were inspected but are not the reported waist chain; their exclusions remain unchanged.
+Released DLL SHA-256:
+8EDD28FD9E1FCA353D42E9CD042BC335C02ACB9968FADCFE1E4FEA17CF08E023
 
-Local asset replay (not a rendered game test):
-- Heart waist chain: exact rest-space mapping using 2 shared bones, residual 0.00000191.
-- Stages 0 / 0.45 / 0.70 / 1.00: moved 0 / 261 / 262 / 262 of 302 vertices.
-- Leather waist belt: anatomical mapping using 6 matched bones, residual 0.00000109; 1833/3470 vertices move at full stage.
-- Mapping round trips and finite static shape results: 20 assertions passed.
-- The neck chain has no direct torso route and is not mapped in this direct replay.
-These counts exercise rest-space conversion plus the existing raw static belly deformation; they do not simulate the complete surface-attachment, pose, shader or native GPU pipeline.
-Optional replay entry point: tests --clothing-replay <local-export.json>. Local full asset geometry and character captures are not distributed.
+Default Test.ps1: 10 suites passed, 13,008 checks/assertions total.
+  Breast physics ownership and axis driver: 69
+  Unrestricted numeric inputs/kernels: 107
+  Main selection/shape/gameplay/storage/defaults: 587
+  Collision runtime/cache: 46
+  Native completion/readiness: 67
+  Mesh lifetime: 28
+  Shared-source lifetime: 25
+  Clothing GPU-copy adapter: 30
+  Skirt kernels and virtual runtime: 11,224
+  Body changes/native update order: 825
+Test-double projects emit unused-field warnings. The production build does not.
+Skirt failure-injection checks intentionally log the simulated matrix failures.
 
-Source comparison: belly shape, F1/F8 settings/defaults, preset, progression, rest-space math, virtual skinning and collision runtime are byte-identical to 0.2.26.
+All 81 default settings in code and the release preset are checked against the
+accepted settings export. The four changes from 0.2.39 are:
+  lowerBreastGuardWidth: 0.18046875 -> 0.2078125
+  heightBoundaryArc: 0.35 -> 0.8
+  upperTransitionStart: 0.18 -> 0.22
+  breastGuard: 1.1125 -> 1
+Other defaults and the 0.2.39 deformation algorithms are unchanged.
 
-In-game feedback (2026-10-06): the reporter confirmed this version successfully fixes the supplied coordinate. This is user-reported validation, separate from the automated checks above. Broader pose coverage, outfit-switching performance and other supplemental garments have not been exhaustively tested in game.
-GPU copying is attempted once per lease only for recognized supplemental garments. It may briefly synchronize the GPU. Failed reads, missing weights, invalid data or unreadable blend-shape meshes leave the original renderer mesh in place and log [Clothing] Cannot read.
-Original game files, coordinate card, installed plugin and user settings were not modified by this task.
+Historical local-only geometry replay (0.2.39, arc 0.35):
+  Curved-boundary suite: 92,743 checks.
+  Weighted breast suite: 90,466 checks.
+  Protection suite: 128,937 checks.
+These depend on full game-geometry captures and are not distributed or invoked
+by the public Test.ps1. They do not validate every pose at the 0.2.40 arc 0.8.
+An extreme thigh -60 degree replay retained 16 extra intersection pairs versus
+native geometry, both before and after curving; ten pairs disappeared and ten
+different pairs appeared. Total extra intersection length decreased, but the
+largest single intersection increased. Seven other tested poses introduced
+no extra pairs in that comparison. This is limited offline evidence only.
+
+Not verified here: continuous live Unity animation, every character/outfit,
+native GPU/Obi behavior in every scene, or broad performance coverage.
+No game installation was modified for this publication.
+
+Publication-only adaptation: breast-physics-tests takes an optional fixture
+path for the private asset replay. Synthetic checks run without it. Runtime
+code was not changed while preparing the public repository.
+The author-selected base/reference cards are included unchanged from the
+installed plugin. Their SHA-256 values are in the release checksum manifest.
+No full mesh captures, native game DLLs, saves, or local config are included.
+Body-change numerical fixtures remain the historical regression inputs;
+they are not a claim of in-game validation of the newly selected reference card.
