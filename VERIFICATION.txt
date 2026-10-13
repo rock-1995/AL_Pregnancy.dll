@@ -1,57 +1,35 @@
-AL Pregnancy 0.2.40 — release verification, 2026-10-13
+AL Pregnancy 0.2.42 - release verification, 2026-10-14
 
-Runtime source is byte-identical to the accepted local 0.2.40 source.
-Production build: succeeded, 0 warnings, 0 errors.
-Public source was separately rebuilt using local game/BepInEx interop assemblies.
-The release uses the already-verified 0.2.40 DLL; a rebuild in another directory
-can differ in binary hash because of build-path/debug metadata.
+The reported grabbing/supporting hand/chest separation was confirmed fixed
+in-game by the user. This is confirmation of that reported case, not of every
+motion, character, outfit or third-party plugin combination.
 
-Released DLL SHA-256:
-8EDD28FD9E1FCA353D42E9CD042BC335C02ACB9968FADCFE1E4FEA17CF08E023
+The release DLL is identical to the installed and user-tested 0.2.42 build.
+DLL SHA-256: FD2CDF3EC24087ABE2EBA4867B1612DE6FB864F8B4CD611788B284F20FDF397E
+Original production build: 0 warnings, 0 errors. Version: 0.2.42.0.
+Runtime source is byte-identical to the tested local 0.2.42 source.
 
-Default Test.ps1: 10 suites passed, 13,008 checks/assertions total.
-  Breast physics ownership and axis driver: 69
-  Unrestricted numeric inputs/kernels: 107
-  Main selection/shape/gameplay/storage/defaults: 587
-  Collision runtime/cache: 46
-  Native completion/readiness: 67
-  Mesh lifetime: 28
-  Shared-source lifetime: 25
-  Clothing GPU-copy adapter: 30
-  Skirt kernels and virtual runtime: 11,224
-  Body changes/native update order: 825
-Test-double projects emit unused-field warnings. The production build does not.
-Skirt failure-injection checks intentionally log the simulated matrix failures.
+Body/animation suite rerun for publication: 923 checks passed, including native
+update ordering, original-data restoration, seven MotionIK readers, two HActor
+readers and eight native animator parameter readers. Coverage includes live
+progress changes after scene entry, switching motion controllers, multiple
+actors, nested reads, exceptions/retries, deferred scene readiness and removal
+of body changes. Native APIs in this suite are managed test doubles.
 
-All 81 default settings in code and the release preset are checked against the
-accepted settings export. The four changes from 0.2.39 are:
-  lowerBreastGuardWidth: 0.18046875 -> 0.2078125
-  heightBoundaryArc: 0.35 -> 0.8
-  upperTransitionStart: 0.18 -> 0.22
-  breastGuard: 1.1125 -> 1
-Other defaults and the 0.2.39 deformation algorithms are unchanged.
+The 0.2.40 public release passed all ten suites (13,008 checks). This publication
+reruns the changed body/animation suite; it does not present the unchanged
+suites or historical geometry replays as new 0.2.42 live validation.
 
-Historical local-only geometry replay (0.2.39, arc 0.35):
-  Curved-boundary suite: 92,743 checks.
-  Weighted breast suite: 90,466 checks.
-  Protection suite: 128,937 checks.
-These depend on full game-geometry captures and are not distributed or invoked
-by the public Test.ps1. They do not validate every pose at the 0.2.40 arc 0.8.
-An extreme thigh -60 degree replay retained 16 extra intersection pairs versus
-native geometry, both before and after curving; ten pairs disappeared and ten
-different pairs appeared. Total extra intersection length decreased, but the
-largest single intersection increased. Seven other tested poses introduced
-no extra pairs in that comparison. This is limited offline evidence only.
+Relative to 0.2.40, production changes are limited to animation parameter
+reads/refresh, registration of those hooks, and version labels. Deformation,
+protection, curvature, virtual skinning and all 81 accepted defaults are unchanged.
+No runtime code was changed during this publication.
 
-Not verified here: continuous live Unity animation, every character/outfit,
-native GPU/Obi behavior in every scene, or broad performance coverage.
-No game installation was modified for this publication.
+The author-selected template cards are unchanged from the 0.2.40 release.
+Body-change numerical fixtures remain historical regression inputs; they are
+not the newly selected reference card. No full game mesh captures, game native
+assemblies, saves or local user configuration are included.
 
-Publication-only adaptation: breast-physics-tests takes an optional fixture
-path for the private asset replay. Synthetic checks run without it. Runtime
-code was not changed while preparing the public repository.
-The author-selected base/reference cards are included unchanged from the
-installed plugin. Their SHA-256 values are in the release checksum manifest.
-No full mesh captures, native game DLLs, saves, or local config are included.
-Body-change numerical fixtures remain the historical regression inputs;
-they are not a claim of in-game validation of the newly selected reference card.
+Earlier local geometry replay at arc 0.35 retained extra intersections in an
+extreme thigh -60 degree pose; that is not a full-pose validation of arc 0.8.
+Optional full-mesh replay remains local-only and requires a supplied fixture.
