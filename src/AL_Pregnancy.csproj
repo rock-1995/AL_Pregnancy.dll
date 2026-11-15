@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>AL_Pregnancy</AssemblyName>
-    <Version>0.2.43</Version>
+    <Version>0.2.44</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
@@ -27,6 +27,7 @@
     <Error Condition="!Exists('$(InteropDir)\Assembly-CSharp.dll')" Text="Set GameDir or InteropDir to AmanatsuLocation's active interop directory." />
   </Target>
 </Project>
+
 
 
 

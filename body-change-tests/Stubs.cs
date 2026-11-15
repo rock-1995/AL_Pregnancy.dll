@@ -77,7 +77,7 @@ namespace Character
     }
     public sealed class Human : NativeObject
     {
-        public HumanData Data=new();public HumanBody Body;public bool Disposed,IsReloading,HiPoly=true;public int Sex=1;
+        public HumanCloth Cloth=new();public HumanData Data=new();public HumanBody Body;public bool Disposed,IsReloading,HiPoly=true;public int Sex=1;
         public GameObject GameObject=new();
         public Human() { Body=new(this); }
         public void Load() {} public void Reload() {} public void ReloadCoordinate() {} public void ReloadHead() {} public void ReloadHair() {} public void ReloadSkin() {} public void ReloadMannequin() {}
@@ -92,7 +92,7 @@ namespace Character
         public HumanBody(Human human) { Human=human; }
         public void SetUpdateShapeBodyValue() { _isUpdateShapeBodyValue=true; }
         public void SetUpdateShapeBody() { _isUpdateShapeBody=true; }
-        public void UpdateShapeBodyValue() { Applied=BodyChangeValues.Read(Human.Data.Custom.Body);ValueUpdates++;_isUpdateShapeBodyValue=false; }
+        public void UpdateShapeBodyValue() { Applied=BodyChangeValues.Read(Human.Data.Custom.Body);Human.Cloth.Apply(Human,Applied);ValueUpdates++;_isUpdateShapeBodyValue=false; }
         public void UpdateShapeBody() { ShapeUpdates++; PhaseTrace.Events.Add("shape"); BodyChangeRuntime.NativeShapeUpdated(this); }
         public void LateUpdate()
         {
@@ -145,3 +145,4 @@ namespace ALPregnancy
         internal static PregnancyRecord FindVisualRecord(Character.Human human)=>PregnancyController.ManualPreviewActive?null:Records.GetValueOrDefault(human.Pointer);
         internal static void UpdateHumanVisual(Character.Human human) { PhaseTrace.Events.Add("belly"); PhaseTrace.Belly?.Invoke(human); } internal static void ReleaseHuman(Character.Human human) { ReleaseMeshes(human); BodyChangeRuntime.Release(human); } internal static int Releases;internal static void ReleaseMeshes(Character.Human human){Releases++;} }
 }
+

@@ -18,6 +18,7 @@ internal static class BodyChangeRuntime
         internal HumanDataBody Working;
         internal BodyChangeValues Last;
         internal BodyChangeValues Original;
+        internal BodyChangeCovers Covers;
         internal Scope Active;
         internal bool NativeShapeDirty;
         internal bool AnimatorParametersDirty;
@@ -29,15 +30,22 @@ internal static class BodyChangeRuntime
     {
         private readonly HumanDataCustom _owner;
         private readonly HumanDataBody _original, _working;
+        private readonly IDisposable _covers;
         private bool _disposed;
-        internal Scope(HumanDataCustom owner, HumanDataBody working)
-        { _owner = owner; _original = owner.Body; _working = working; owner.Body = working; }
+        internal Scope(HumanDataCustom owner, HumanDataBody working, BodyChangeCovers covers, Human human)
+        {
+            _owner = owner; _original = owner.Body; _working = working;
+            _covers = covers?.Begin(BodyChangeCovers.Current(human));
+            try { owner.Body = working; }
+            catch { _covers?.Dispose(); throw; }
+        }
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true;
             // A native reload is allowed to replace the entire body during the call.
-            if (_owner.Body?.Pointer == _working.Pointer) _owner.Body = _original;
+            try { if (_owner.Body?.Pointer == _working.Pointer) _owner.Body = _original; }
+            finally { _covers?.Dispose(); }
         }
     }
 
@@ -99,7 +107,7 @@ internal static class BodyChangeRuntime
 
     // MotionIK reads Human.Data.Custom.Body, including through an inlined native
     // GetShapeBodyValue. Supply the last committed visual body only while native
-    // contact correction runs, retaining its cover values and edition conversion.
+    // contact correction runs, retaining native cover selection and edition conversion.
     // Never refresh shape/physics or recompute pregnancy inside an IK callback.
     internal static Scope BeginAnimationRead(HumanBody body)
     {
@@ -112,7 +120,7 @@ internal static class BodyChangeRuntime
             return null;
         var owner = human.Data?.Custom;
         if (owner?.Body == null) return null;
-        var scope = new Scope(owner, entry.Working);
+        var scope = new Scope(owner, entry.Working, entry.Covers, human);
         entry.Active = scope;
         return scope;
     }
@@ -134,20 +142,25 @@ internal static class BodyChangeRuntime
         original.Validate();
         var target = original.Apply(_delta, progress, PregnancyConfig.BodyLower.Value,
             PregnancyConfig.BodyUpper.Value, PregnancyConfig.NippleColorMaximum.Value);
-        if (target.Same(original)) { Release(human); return null; }
-        if (!Entries.TryGetValue(human.Pointer, out var entry) || entry.BodyPointer != human.Body.Pointer)
+        Entries.TryGetValue(human.Pointer, out var entry);
+        var covers = BodyChangeCovers.Prepare(entry?.Covers, BodyChangeCovers.Current(human),
+            _delta.Shape, progress, PregnancyConfig.BodyLower.Value, PregnancyConfig.BodyUpper.Value);
+        if (target.Same(original) && covers?.HasChanges != true) { Release(human); return null; }
+        if (entry == null || entry.BodyPointer != human.Body.Pointer)
         {
             Release(human);
             Entries[human.Pointer] = entry = new Entry { Human = human, BodyPointer = human.Body.Pointer, Working = new HumanDataBody() };
         }
         if (entry.Active != null) return null; // Defensive against a reentrant native update.
+        bool coversChanged = !ReferenceEquals(covers, entry.Covers);
+        entry.Covers = covers;
         bool sourceChanged = !original.Same(entry.Original);
         bool nativeChanged = entry.NativeShapeDirty;
-        bool changed = !target.Same(entry.Last) || sourceChanged || nativeChanged;
-        bool shapeChanged = entry.Last == null || !target.Shape.SequenceEqual(entry.Last.Shape);
+        bool changed = !target.Same(entry.Last) || sourceChanged || nativeChanged || coversChanged;
+        bool shapeChanged = entry.Last == null || !target.Shape.SequenceEqual(entry.Last.Shape) || coversChanged;
         entry.Working.Copy(owner.Body);
         target.Write(entry.Working);
-        var scope = new Scope(owner, entry.Working);
+        var scope = new Scope(owner, entry.Working, entry.Covers, human);
         entry.Active = scope;
         var previous = entry.Last ?? original;
         // Record the attempted target before any native setter, so a partial native
@@ -224,3 +237,4 @@ internal static class BodyChangeRuntime
     internal static void ReleaseAll()
     { foreach (var entry in Entries.Values.ToArray()) Release(entry.Human); }
 }
+

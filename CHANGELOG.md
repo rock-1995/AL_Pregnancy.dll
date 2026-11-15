@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.44
+
+- Apply template body-slider changes to enabled clothing shape corrections, using each garment's original correction values and the existing progression and slider limits.
+- Supply the same corrected values to native animation reads. Preserve garment selection and restore saved body/clothing data after each update, including exceptions and reloads.
+
 ## 0.2.43
 
 - Set Forward fullness (`growthFullness`) to **1.10**, previously 1.116265, in both built-in defaults and the supplied preset. The other 80 shape defaults are unchanged.
@@ -78,3 +83,4 @@
 - Add configurable growth milestones with linear interpolation.
 - Replace per-pregnancy random duration with independent daily growth variation.
 - Retain the existing Obi global mesh-index synchronization fix.
+

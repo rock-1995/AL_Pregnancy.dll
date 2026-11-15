@@ -10,5 +10,6 @@
     <Compile Include="../src/PregnancyState.cs" Link="PregnancyState.cs" />
     <Compile Include="../src/PregnancyGrowthSchedule.cs" Link="PregnancyGrowthSchedule.cs" />
     <None Include="fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
+  <Compile Include="../src/BodyChangeCovers.cs" /></ItemGroup>
 </Project>
+
