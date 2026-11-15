@@ -1,3 +1,12 @@
+AL Pregnancy 0.2.44 - release verification, 2026-11-16
+
+Production rebuild: 0 warnings, 0 errors. Body/animation/clothing-correction regression: 944 checks passed.
+The published DLL is byte-identical to the installed 0.2.44 build from 2026-10-18; production source matches that build's archived source.
+DLL SHA-256: 953AFCB4295CEACE1DDD02B6177B6DCB323869873AC8EFEB7BD50AED494CD16B
+The original 2026-10-18 full Test.ps1 run passed. This publication reran the build and focused body-change suite. No game was launched or visual scene tested for this publication.
+
+Previous verification:
+
 AL Pregnancy 0.2.43 - verification, 2026-10-14
 
 Production build: 0 warnings, 0 errors. Assembly version: 0.2.43.0.

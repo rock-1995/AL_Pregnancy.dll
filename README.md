@@ -1,6 +1,6 @@
 # AL Pregnancy
 
-**Version 0.2.43** — a BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
+**Version 0.2.44** — a BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
 
 Pregnancy progresses with game days and drives a growing belly, clothing deformation, pose response, and optional body changes based on childbirth history. Use **F1** for global settings through a compatible configuration manager and **F8** for character state and manual shape preview.
 
@@ -15,7 +15,7 @@ Pregnancy progresses with game days and drives a growing belly, clothing deforma
 - Thigh-side, thigh-bone, and localized lowest-belly/pubic guards shared by shape and pose blending.
 - Clothing deformation, supported supplemental clothing slots, and skirt-chain support that releases toward the native moving hem.
 - Synchronization with existing low-detail body/fluid collision meshes and Obi mesh indices.
-- Optional body changes using the difference between two character cards, applied to each character's own original body.
+- Optional body changes using the difference between two character cards, applied to each character's own original body and enabled clothing shape corrections.
 - F8 character/debug controls, manual preview, unrestricted finite numeric shape input, and diagnostic export.
 
 ## Pregnancy gameplay and F1
@@ -156,3 +156,4 @@ Test.ps1 runs ten offline suites: breast-physics ownership/axis driver, unrestri
 - `VERIFICATION.txt`: validation scope and limitations.
 
 Prebuilt binaries belong in Releases. The selected template pair is in `templates/`; full diagnostic captures, saves, and local configuration are excluded.
+

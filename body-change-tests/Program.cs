@@ -98,6 +98,7 @@ Tick();BodyChangeRuntime.Release(human);human.Body=new HumanBody(human);Tick();
 Check("body reload reapplies color and auxiliary settings",human.Body.ExtraCalls==9);
 BoundaryOrderRegression.Run(Check);
 AnimationContactRegression.Run(Check);
+CoverRegression.Run(Check);
 BodyChangeRuntime.ReleaseAll();human.Body.ThrowExtra=true;
 try {BodyChangeRuntime.BeginAfterBelly(human,pregnancy);throw new Exception("expected failure");}catch(InvalidOperationException){}
 Check("native preparation failure cannot leak temporary data",ReferenceEquals(human.Data.Custom.Body,originalBody));
@@ -110,3 +111,4 @@ BodyChangeRuntime.ReleaseAll();
 Tick();File.Delete(Path.Combine(AppContext.BaseDirectory,"reference.png"));Time.unscaledTime=3;
 Tick();Check("missing replacement card restores original instead of stale changes",human.Body.Applied.Same(BodyChangeValues.Read(originalBody)));
 Console.WriteLine($"Body change regression: {passed} checks passed.");
+
