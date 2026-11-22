@@ -5,7 +5,7 @@ namespace ALPregnancy;
 
 public sealed class PregnancySaveEnvelope
 {
-    public int Version { get; set; } = 3;
+    public int Version { get; set; } = 4;
     public string NativeHash { get; set; } = "";
     public string NativeStamp { get; set; } = "";
     public PregnancyWorld World { get; set; }
@@ -78,7 +78,7 @@ public static class PregnancyStorage
         world.Validate();
         AtomicWrite(Sidecar(path), new PregnancySaveEnvelope { NativeHash = hash, NativeStamp = stamp, World = world });
     }
-    public static PregnancyWorld Load(string path, string nativeStamp, out string status, PregnancyRules migrationRules = null, int startDay = 40)
+    public static PregnancyWorld Load(string path, string nativeStamp, out string status, PregnancyRules migrationRules = null, int startDay = 40, int bodyBirths = 5)
     {
         string hash = Hash(path);
         bool hadData = false;
@@ -93,8 +93,8 @@ public static class PregnancyStorage
                 using var document = JsonDocument.Parse(File.ReadAllText(candidate));
                 var root = document.RootElement;
                 int version = root.GetProperty("Version").GetInt32();
-                if ((version < 1 || version > 3) || root.GetProperty("NativeHash").GetString() != hash || hash.Length == 0) continue;
-                var world = PregnancyMigration.Read(root.GetProperty("World"), migrationRules ?? new PregnancyRules(), startDay);
+                if ((version < 1 || version > 4) || root.GetProperty("NativeHash").GetString() != hash || hash.Length == 0) continue;
+                var world = PregnancyMigration.Read(root.GetProperty("World"), migrationRules ?? new PregnancyRules(), startDay, bodyBirths);
                 status = candidate.EndsWith(".bak") ? "Loaded matching backup" : "Loaded pregnancy save";
                 return world;
             }

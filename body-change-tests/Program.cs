@@ -49,7 +49,7 @@ var pregnancy=new PregnancyRecord {Pregnant=true,PregnancyProgress=.5};
 void Tick()
 {
     human.Body.LateUpdate();
-    BodyChangeRuntime.ApplyAfterBelly(human,pregnancy);
+    TestAppearance.Apply(human,pregnancy);
 }
 Tick();var first=human.Body.Applied;
 Check("post-belly native shape commit observes changed values",Near(first.Shape[3],baseline.Shape[3]+delta.Shape[3]*.1));
@@ -68,11 +68,13 @@ Check("one hundred stable frames do not call native auxiliary setters",human.Bod
 human.Body.SetUpdateShapeBodyValue();human.Body.SetUpdateShapeBody();Tick();
 Check("game-requested base refresh is followed by target once after belly",human.Body.Applied.Same(first)&&human.Body.ValueUpdates==3&&human.Body.ShapeUpdates==3);
 originalBody.skinId=23;
-var liveUnrelated=BodyChangeRuntime.BeginAfterBelly(human,pregnancy);
+BodyChangeRuntime.NativeShapeUpdated(human.Body);
+var liveUnrelated=TestAppearance.Begin(human,pregnancy);
 Check("temporary body preserves current unrelated data",human.Data.Custom.Body.skinId==23);
 BodyChangeRuntime.End(human,liveUnrelated);
-var outer=BodyChangeRuntime.BeginAfterBelly(human,pregnancy);
-var nested=BodyChangeRuntime.BeginAfterBelly(human,pregnancy);
+BodyChangeRuntime.NativeShapeUpdated(human.Body);
+var outer=TestAppearance.Begin(human,pregnancy);
+var nested=TestAppearance.Begin(human,pregnancy);
 Check("reentrant native call does not add twice",nested==null&&BodyChangeValues.Read(human.Data.Custom.Body).Same(first));
 BodyChangeRuntime.End(human,nested);BodyChangeRuntime.End(human,outer);
 Check("outer native scope survives nested finalizer",ReferenceEquals(human.Data.Custom.Body,originalBody));
@@ -100,10 +102,10 @@ BoundaryOrderRegression.Run(Check);
 AnimationContactRegression.Run(Check);
 CoverRegression.Run(Check);
 BodyChangeRuntime.ReleaseAll();human.Body.ThrowExtra=true;
-try {BodyChangeRuntime.BeginAfterBelly(human,pregnancy);throw new Exception("expected failure");}catch(InvalidOperationException){}
+try {TestAppearance.Begin(human,pregnancy);throw new Exception("expected failure");}catch(InvalidOperationException){}
 Check("native preparation failure cannot leak temporary data",ReferenceEquals(human.Data.Custom.Body,originalBody));
 human.Body.ThrowExtra=false;
-var failed=BodyChangeRuntime.BeginAfterBelly(human,pregnancy);
+var failed=TestAppearance.Begin(human,pregnancy);
 try {throw new InvalidOperationException("native LateUpdate failure");}catch(InvalidOperationException){}
 finally {BodyChangeRuntime.End(human,failed);BodyChangeRuntime.End(human,failed);}
 Check("native failure restoration is idempotent",ReferenceEquals(human.Data.Custom.Body,originalBody));

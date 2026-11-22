@@ -74,15 +74,23 @@ public sealed class PregnancyController : MonoBehaviour
             if (!Usable(_selected) || _selected.IsReloading) return;
             if (!MorphReadiness.TryBeginApply(_selected)) { _status = MorphReadiness.Status; return; }
             var meshes = MorphReadiness.CurrentMeshes(_selected);
-            var changes = _lease?.CheckChanges(meshes) ?? default;
-            if (_lease == null || changes.Mesh)
+            var changes = MorphReadiness.ChangedAtBoundary(_selected) ? _lease?.CheckChanges(meshes) ?? default : default;
+            if (_lease != null && changes.Mesh)
+            {
+                BellyVertexMorph.BeforeClothingMeshesChanged(Id(_selected));
+                _lease.Refresh(_selected, meshes);
+                MorphReadiness.RememberLeasedMeshes(_selected);
+                BellyVertexMorph.InvalidateClothingMeshes(Id(_selected));
+            }
+            if (_lease == null)
             {
                 RestoreMeshes();
                 _lease = new MeshLease();
                 _lease.Acquire(_selected, meshes);
+                MorphReadiness.RememberLeasedMeshes(_selected);
                 PregnancyPlugin.Logger.LogInfo($"Preview meshes: readable={_lease.ReadableCount}, skipped-unreadable={_lease.UnreadableCount}");
             }
-            if (changes.Visibility) BellyVertexMorph.Invalidate(Id(_selected));
+            if (changes.Visibility) BellyVertexMorph.InvalidateVisibility(Id(_selected));
             BellyVertexMorph.Apply(_selected, Id(_selected), _rate);
             _status = BellyVertexMorph.GetStatusLine(Id(_selected));
             if (!BellyVertexMorph.HasValidBody(Id(_selected)))
@@ -187,7 +195,7 @@ public sealed class PregnancyController : MonoBehaviour
             _window.height = Mathf.Min(610, Screen.height - 30);
             _window.x = Mathf.Clamp(_window.x, 0, Mathf.Max(0, Screen.width - _window.width));
             _window.y = Mathf.Clamp(_window.y, 0, Mathf.Max(0, Screen.height - _window.height));
-            _window = GUI.Window(0x414C50, _window, _draw, "AL Pregnancy 0.2.44 - F8");
+            _window = GUI.Window(0x414C50, _window, _draw, "AL Pregnancy 0.3.5 - F8");
         }
         catch (Exception ex)
         {

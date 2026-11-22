@@ -14,8 +14,13 @@ internal static class NativeVisualUpdate
         try
         {
             PregnancyRuntime.UpdateHumanVisual(human);
+            bool wasPreview = PregnancyController.ManualPreviewActive;
             PregnancyController.AfterNativeUpdate(human);
-            BodyChangeRuntime.ApplyAfterBelly(human, PregnancyRuntime.FindVisualRecord(human));
+            if (wasPreview && !PregnancyController.ManualPreviewActive) PregnancyRuntime.UpdateHumanVisual(human);
+            // Both render paths consume the same customization values. No
+            // pregnancy simulation or roster search is needed on stable frames.
+            var custom = human.Data?.Custom;
+            BodyChangeRuntime.ApplyAfterBelly(human, custom == null ? 0 : PregnancyAppearance.Get(custom).Body);
             BellyVertexMorph.UpdateVirtual(human);
             BellyVertexMorph.UpdateBodyCollision(human);
         }

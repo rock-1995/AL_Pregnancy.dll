@@ -26,7 +26,7 @@ internal static partial class BellyVertexMorph
         internal VirtualBinding Skin;
         internal NMatrix ToReference;
         internal CollisionDeformation Shape;
-        internal NVector[] LastWritten;
+        internal NVector[] LastWritten, OriginalWorld;
         internal int Mapped, Moved;
         internal float MaxWorld;
         internal bool Written, Dispatch, Submitted;
@@ -85,7 +85,10 @@ internal static partial class BellyVertexMorph
     private static void BeforeCollisionWorldUpdate(ObiColliderWorld __instance)
     {
         if (DirtyCollisionMeshes.Count == 0 || __instance == null) return;
-        var readers = new List<(ObiColliderHandle Handle, ObiMeshShapeTracker Tracker)>();
+        // Loan the scratch list for this call. Reentrant world callbacks must
+        // take a separate list while the outer snapshot remains in use.
+        var readers = CollisionReaderScratch.Readers ?? new List<(ObiColliderHandle Handle, ObiMeshShapeTracker Tracker)>();
+        CollisionReaderScratch.Readers = null;
         bool refreshReaders = false;
         try
         {
@@ -117,12 +120,20 @@ internal static partial class BellyVertexMorph
         }
         finally
         {
-            if (refreshReaders)
+            try
             {
-                // Even UNCHANGED/static mesh colliders can have shifted indices. Force
-                // them through the upcoming native pass, including after a partial failure.
-                foreach (var reader in readers) __instance.MarkColliderAsNeedingUpdate(reader.Handle);
-                __instance.SetDirty();
+                if (refreshReaders)
+                {
+                    // Even UNCHANGED/static mesh colliders can have shifted indices. Force
+                    // them through the upcoming native pass, including after a partial failure.
+                    foreach (var reader in readers) __instance.MarkColliderAsNeedingUpdate(reader.Handle);
+                    __instance.SetDirty();
+                }
+            }
+            finally
+            {
+                readers.Clear();
+                CollisionReaderScratch.Readers ??= readers;
             }
         }
     }
@@ -203,6 +214,7 @@ internal static partial class BellyVertexMorph
         {
             b.Carrier = b.Rig.ExpectedVirtual.Pelvis;
             b.DynamicWeights = new Il2CppSystem.Collections.Generic.List<VertexWeight>();
+            b.OriginalWorld = new NVector[shape.Indices.Length];
             foreach (int i in shape.Indices)
                 b.DynamicWeights.Add(new VertexWeight { Index = i, Weight = 1 });
             groups.Add(new WeightList { Transform = b.Carrier, Weights = b.DynamicWeights });
@@ -287,6 +299,7 @@ internal static partial class BellyVertexMorph
         }
         b.Skin.Tick++; b.Moved = 0; b.MaxWorld = 0;
         Array.Clear(shape.Support, 0, shape.Support.Length);
+        int originalIndex = 0;
         foreach (int i in shape.Indices)
         {
             var native = CollisionNativeSkin(b.Skin, i);
@@ -296,14 +309,18 @@ internal static partial class BellyVertexMorph
             shape.World[i] = world;
             if (support && shape.Candidates[i])
                 shape.Support[i] = fold.Field.Correction(shape.Material[i], NVector.Transform(world, inverseFrame) / state.Profile.Span, false);
+            // NativeMatrix is cached for this Skin.Tick. Reuse this exact
+            // weighted matrix for the diagnostic baseline in the next pass.
+            b.OriginalWorld[originalIndex++] = NVector.Transform(shape.Original[i], native);
         }
+        originalIndex = 0;
         foreach (int i in shape.Indices)
         {
             var final = shape.World[i] + NVector.TransformNormal(shape.Support[i] * state.Profile.Span, frameWorld);
             var local = NVector.Transform(final, inverseCarrier);
             if (!float.IsFinite(local.LengthSquared())) throw new InvalidOperationException("Invalid collision carrier position.");
             shape.CarrierLocal[i] = local;
-            float moved = NVector.Distance(final, NVector.Transform(shape.Original[i], CollisionNativeSkin(b.Skin, i)));
+            float moved = NVector.Distance(final, b.OriginalWorld[originalIndex++]);
             if (moved > 1e-7f) { b.Moved++; b.MaxWorld = MathF.Max(b.MaxWorld, moved); }
         }
         // All requested positions passed validation; never leave half a pose in
@@ -378,12 +395,17 @@ internal static partial class BellyVertexMorph
         try
         {
             bool changed = !b.Written; var vertices = __instance._newVert;
-            for (int i = 0; i < b.LastWritten.Length; i++)
+            try
             {
-                var value = vertices[i]; var point = new NVector(value.x, value.y, value.z);
-                if (!float.IsFinite(point.LengthSquared())) throw new InvalidOperationException("Invalid native collision output.");
-                changed |= NVector.DistanceSquared(point, b.LastWritten[i]) > 1e-14f; b.LastWritten[i] = point;
+                var values = vertices.AsSpan();
+                for (int i = 0; i < b.LastWritten.Length; i++)
+                {
+                    var value = values[i]; var point = new NVector(value.x, value.y, value.z);
+                    if (!float.IsFinite(point.LengthSquared())) throw new InvalidOperationException("Invalid native collision output.");
+                    changed |= NVector.DistanceSquared(point, b.LastWritten[i]) > 1e-14f; b.LastWritten[i] = point;
+                }
             }
+            finally { GC.KeepAlive(vertices); }
             b.Written = true; b.Rig.Writes++;
             // Native code already wrote/cooked the FINAL shape. No vertices,
             // bounds or sharedMesh resubmission here. Only notify the Obi reader.
@@ -403,5 +425,12 @@ internal static partial class BellyVertexMorph
         BeforeCollisionWorldUpdate(ObiColliderWorld.instance);
         CollisionBindings.Clear(); DirtyCollisionMeshes.Clear(); NativeCollisionMeshes.Clear(); CollisionHooksReady = false;
     }
+}
+
+// Keep scratch storage outside the morph's partial type so adding it does not
+// renumber compiler-generated methods in the unchanged deformation code.
+internal static class CollisionReaderScratch
+{
+    internal static List<(ObiColliderHandle Handle, ObiMeshShapeTracker Tracker)> Readers = new();
 }
 

@@ -5,16 +5,19 @@ namespace ALPregnancy;
 
 public static class PregnancyMigration
 {
-    // Migration is memory-only; the next actual game save writes v3 alongside that slot.
-    public static PregnancyWorld Read(JsonElement json, PregnancyRules rules, int startDay = 40)
+    // Migration is memory-only; the next actual game save writes v4 alongside that slot.
+    public static PregnancyWorld Read(JsonElement json, PregnancyRules rules, int startDay = 40, int bodyBirths = 5)
     {
         int version = json.GetProperty("Version").GetInt32();
-        if (version == 3)
+        if (version == 4)
         {
+            ValidateAppearanceJson(json);
             var current = JsonSerializer.Deserialize<PregnancyWorld>(json.GetRawText());
             current.Validate();
             return current;
         }
+        if (version == 3)
+            return AddAppearance(JsonSerializer.Deserialize<PregnancyWorld>(json.GetRawText()), rules, bodyBirths);
         if (version != 1 && version != 2) throw new InvalidDataException("Unsupported pregnancy save version.");
         var node = JsonNode.Parse(json.GetRawText());
         foreach (var entry in node["Characters"].AsObject())
@@ -57,9 +60,44 @@ public static class PregnancyMigration
         }
         node["CardCycleProgress"] = cards;
         node.AsObject().Remove("CardCycles");
-        node["Version"] = 3;
+        node["Version"] = 4;
         var world = JsonSerializer.Deserialize<PregnancyWorld>(node.ToJsonString());
+        return AddAppearance(world, rules, bodyBirths);
+    }
+
+    private static PregnancyWorld AddAppearance(PregnancyWorld world, PregnancyRules rules, int bodyBirths)
+    {
+        if (world?.Characters == null) throw new InvalidDataException("Invalid legacy pregnancy world.");
+        foreach (var item in world.Characters)
+        {
+            var record = item.Value ?? throw new InvalidDataException("Invalid legacy pregnancy record: " + item.Key);
+            record.Appearance = new AppearanceValues
+            {
+                Belly = record.Growth(rules),
+                Body = (float)BodyChangeMath.Progress(record.IsPregnant, record.PregnancyProgress, record.Births, bodyBirths)
+            };
+        }
+        world.Version = 4;
         world.Validate();
         return world;
+    }
+
+    // Slider setters clamp interactive inputs. Validate the stored numbers before
+    // deserialization so a damaged v4 file cannot be silently clamped on load.
+    private static void ValidateAppearanceJson(JsonElement world)
+    {
+        foreach (var entry in world.GetProperty("Characters").EnumerateObject())
+        {
+            if (entry.Value.ValueKind != JsonValueKind.Object ||
+                !entry.Value.TryGetProperty("Appearance", out var appearance) ||
+                appearance.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException("Missing character appearance values: " + entry.Name);
+            foreach (string name in new[] { "Belly", "Body" })
+            {
+                if (!appearance.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number ||
+                    !value.TryGetDouble(out double number) || !double.IsFinite(number) || number < 0 || number > 1)
+                    throw new InvalidDataException("Invalid character appearance " + name + ": " + entry.Name);
+            }
+        }
     }
 }

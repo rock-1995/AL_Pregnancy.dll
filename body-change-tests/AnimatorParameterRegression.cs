@@ -16,15 +16,15 @@ internal static class AnimatorParameterRegression
         HScene.Instance=new HScene{Controller=controller};
         controller.UpdateAnimeParam();
         float before=controller.BreastParameters[0];
-        BodyChangeRuntime.ApplyAfterBelly(female,record);
+        TestAppearance.Apply(female,record);
         float target=female.Body.Applied.Shape[3];
         check("live F8 progress changes chest after scene entry",target!=before);
         check("both animators refresh to displayed chest after live progress change",controller.BreastParameters.All(x=>x==target)&&controller.Updates==2);
         check("live refresh restores original card immediately",ReferenceEquals(female.Data.Custom.Body,saved)&&BodyChangeValues.Read(saved).Same(original));
-        for(int i=0;i<100;i++)BodyChangeRuntime.ApplyAfterBelly(female,record);
+        for(int i=0;i<100;i++)TestAppearance.Apply(female,record);
         check("stable frames do not repeatedly refresh animation parameters",controller.Updates==2);
         female.Body.SetUpdateShapeBodyValue();female.Body.SetUpdateShapeBody();female.Body.LateUpdate();
-        BodyChangeRuntime.ApplyAfterBelly(female,record);
+        TestAppearance.Apply(female,record);
         check("same shape reapplied by native game does not refresh animator again",controller.Updates==2);
 
         // Reproduce the previous release's uncovered read, then exercise every
@@ -43,11 +43,11 @@ internal static class AnimatorParameterRegression
 
         controller.ThrowAfterRead=true;
         record.PregnancyProgress=.95;
-        try {BodyChangeRuntime.ApplyAfterBelly(female,record);throw new Exception("expected animator failure");}
+        try {TestAppearance.Apply(female,record);throw new Exception("expected animator failure");}
         catch(InvalidOperationException){}
         check("failed explicit animation refresh still restores card",ReferenceEquals(female.Data.Custom.Body,saved));
         int failedUpdates=controller.Updates;
-        controller.ThrowAfterRead=false;BodyChangeRuntime.ApplyAfterBelly(female,record);
+        controller.ThrowAfterRead=false;TestAppearance.Apply(female,record);
         check("failed refresh remains pending and retries",controller.Updates==failedUpdates+1&&controller.BreastParameters[0]==female.Body.Applied.Shape[3]);
 
         BodyChangeAnimation.BeforeAnimator(controller,out var outer);
@@ -63,7 +63,7 @@ internal static class AnimatorParameterRegression
         // the only woman when temporarily providing the native controller data.
         var other=new Human();other.Data.Custom.Body=HumanData.LoadFixture("base");
         var otherSaved=other.Data.Custom.Body;
-        BodyChangeRuntime.ApplyAfterBelly(other,new PregnancyRecord{Births=4});
+        TestAppearance.Apply(other,new PregnancyRecord{Births=4});
         controller._actors=new[]{actors[0],actors[1],new HActor{Human=other}};
         BodyChangeAnimation.BeforeAnimator(controller,out var three);
         check("three-person reader exposes both modified bodies",female.Data.Custom.Body.shapeValueBody[3]==female.Body.Applied.Shape[3]&&other.Data.Custom.Body.shapeValueBody[3]==other.Body.Applied.Shape[3]);
@@ -74,9 +74,9 @@ internal static class AnimatorParameterRegression
 
         HScene.Instance.Loaded=false;
         int beforeNotReady=controller.Updates;record.PregnancyProgress=.5;
-        BodyChangeRuntime.ApplyAfterBelly(female,record);
+        TestAppearance.Apply(female,record);
         check("unready scene defers parameter refresh",controller.Updates==beforeNotReady);
-        HScene.Instance.Loaded=true;BodyChangeRuntime.ApplyAfterBelly(female,record);
+        HScene.Instance.Loaded=true;TestAppearance.Apply(female,record);
         check("pending refresh applies when scene becomes ready",controller.Updates==beforeNotReady+1&&controller.BreastParameters[0]==female.Body.Applied.Shape[3]);
         BodyChangeRuntime.Release(female);
         check("removing body changes also restores native animator parameters",controller.BreastParameters.All(x=>x==before));

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable><NuGetAudit>false</NuGetAudit><SourceRoot>../src</SourceRoot></PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Generated.cs" />
+    <Compile Include="Generated.cs" />
+    <Compile Include="$(SourceRoot)/TorsoSelectionPolicy.cs;$(SourceRoot)/SupplementalClothing.cs" />
+    <None Update="panst-assets.jsonl" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="ExtractProductionClassifier" BeforeTargets="BeforeCompile">
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="python &quot;$(MSBuildProjectDirectory)/Extract.py&quot; &quot;$(SourceRoot)&quot; &quot;$(MSBuildProjectDirectory)/Generated.cs&quot;" />
+  </Target>
+</Project>

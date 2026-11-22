@@ -19,6 +19,8 @@ internal static partial class BellyVertexMorph
         public bool Failed;
         public float LowerStart, LowerWidth, LowerBias;
         public FoldRig Fold;
+        public MaterialBlendField BodyMaterial;
+        public int BodyMaterialRevision = -1;
         public long UpdateTicks,MaxTicks,UpdateCount,PaletteWrites;
     }
     private sealed class VirtualBinding
@@ -69,65 +71,63 @@ internal static partial class BellyVertexMorph
 
     private static void PrepareVirtual(CharaState state,List<MeshRecord> records,float stage,Human human = null)
     {
-        state.Virtual=null;
         var settings=BellyDeformSettings.Vtx;
         if(stage<=0 || state.Profile==null)return;
-        var reference=VirtualAxisMath.Reference(state.Profile,stage,settings);
         var frame=FrameMatrix(state.Frame);
-        reference=new VirtualAxisMath.Axis(NVector.Transform(reference.Anchor,frame),NVector.Transform(reference.Upper,frame));
-        Transform[] bones=state.SMR.bones;UMatrix[] binds=state.SMR.sharedMesh.bindposes;
-        int spine=-1;float distance=float.MaxValue;
-        for(int i=0;i<bones.Length && i<binds.Length;i++)
+        bool newRig=state.Virtual==null;
+        if(newRig)
         {
-            if(bones[i]==null || !RigBoneNames.Canonical(bones[i].name).StartsWith("cf_s_spine",StringComparison.Ordinal))continue;
-            if(!NMatrix.Invert(MatrixBridge.ToManaged(binds[i]),out var rest))continue;
-            float d=NVector.DistanceSquared(reference.Upper,rest.Translation);
-            if(d<distance){distance=d;spine=i;}
+            var reference=VirtualAxisMath.Reference(state.Profile,stage,settings);
+            reference=new VirtualAxisMath.Axis(NVector.Transform(reference.Anchor,frame),NVector.Transform(reference.Upper,frame));
+            Transform[] bones=state.SMR.bones;UMatrix[] binds=state.SMR.sharedMesh.bindposes;
+            int spine=-1;float distance=float.MaxValue;
+            for(int i=0;i<bones.Length && i<binds.Length;i++)
+            {
+                if(bones[i]==null || !RigBoneNames.Canonical(bones[i].name).StartsWith("cf_s_spine",StringComparison.Ordinal))continue;
+                if(!NMatrix.Invert(MatrixBridge.ToManaged(binds[i]),out var rest))continue;
+                float d=NVector.DistanceSquared(reference.Upper,rest.Translation);
+                if(d<distance){distance=d;spine=i;}
+            }
+            if(spine<0 || state.PelvisIdx<0 || state.PelvisIdx>=binds.Length)return;
+            state.Virtual=new VirtualRig {Reference=reference,Pelvis=bones[state.PelvisIdx],Spine=bones[spine],
+                PelvisBind=MatrixBridge.ToManaged(binds[state.PelvisIdx]),SpineBind=MatrixBridge.ToManaged(binds[spine]),
+                LowerStart=settings.LowerTransitionStart,LowerWidth=settings.LowerTransitionWidth,LowerBias=settings.LowerTransitionBias};
         }
-        if(spine<0 || state.PelvisIdx<0 || state.PelvisIdx>=binds.Length)return;
-        state.Virtual=new VirtualRig {Reference=reference,Pelvis=bones[state.PelvisIdx],Spine=bones[spine],
-            PelvisBind=MatrixBridge.ToManaged(binds[state.PelvisIdx]),SpineBind=MatrixBridge.ToManaged(binds[spine]),
-            LowerStart=settings.LowerTransitionStart,LowerWidth=settings.LowerTransitionWidth,LowerBias=settings.LowerTransitionBias};
+        // Match the native-completion capture point used before incremental
+        // binding. Reusing the rig and material weights must not extend the
+        // lifetime of the driver's captured inputs beyond the old behavior.
         state.Virtual.PelvisDriver = AxisPoseDriver.Capture(human, state.Virtual.Pelvis, HumanMagicaSpringSetting.Type.Waist);
         state.Virtual.SpineDriver = AxisPoseDriver.Capture(human, state.Virtual.Spine, HumanMagicaSpringSetting.Type.Spine);
 
-        // Material correspondences are built only on shape changes. Clothing
-        // samples the same material attachment field as its nearest skin patch.
-        float span=state.Profile.Span;
+        // The body attachment field changes with the shape or visible skin set,
+        // but not when only a garment is hidden or shown. Keep one current field.
         NMatrix.Invert(frame,out var inverseFrame);
-        var body=new MaterialBlendField(span);
-        var alphaByRecord=new Dictionary<MeshRecord,float[]>();
+        if(state.Virtual.BodyMaterial==null || state.Virtual.BodyMaterialRevision!=state.SurfaceRevision)
+        {
+            var body=new MaterialBlendField(state.Profile.Span);
+            foreach(var r in records)
+            {
+                if(r.IsCloth || !CanBindVirtual(r) || !BodyMeshSelection.IsBodyPiece(r.Renderer))continue;
+                var alpha=MaterialAlpha(state,r,stage,inverseFrame);
+                for(int i=0;i<alpha.Length;i++)
+                    body.Add(NVector.Transform(new NVector(r.OrigVerts[i].x,r.OrigVerts[i].y,r.OrigVerts[i].z),r.ToReference),alpha[i]);
+            }
+            state.Virtual.BodyMaterial=body;
+            state.Virtual.BodyMaterialRevision=state.SurfaceRevision;
+        }
+        int attached=0;
         foreach(var r in records)
         {
-            if(r.Renderer==null || !r.Renderer.enabled || !r.Renderer.gameObject.activeInHierarchy || r.LastNewV==null || r.ActualMoved==0)continue;
-            var alpha=new float[r.OrigVerts.Length];alphaByRecord[r]=alpha;
-            for(int i=0;i<alpha.Length;i++)
-            {
-                var o=NVector.Transform(new NVector(r.OrigVerts[i].x,r.OrigVerts[i].y,r.OrigVerts[i].z),r.ToReference);
-                var n=NVector.Transform(new NVector(r.LastNewV[i].x,r.LastNewV[i].y,r.LastNewV[i].z),r.ToReference);
-                var material=NVector.Transform(o,inverseFrame);
-                alpha[i]=VirtualAxisMath.MaterialSurfaceWeight(NVector.Distance(o,n),material,state.Profile,stage,settings,
-                    BellyShape.DeformationInfluence(r.BellyInfluence == null ? 1 : r.BellyInfluence[i], material, state.Profile, settings));
-                alpha[i] *= BodyProtection.Keep(r.ProtectionKeep, i);
-                if(BreastExclusion.Contains(r.BreastExcluded,i))alpha[i]=0;
-                if(settings.VirtualAxisStrength<=0)alpha[i]=0;
-            }
-            if(!r.IsCloth)
-            {
-                if(BodyMeshSelection.IsBodyPiece(r.Renderer))
-                    for(int i=0;i<alpha.Length;i++)
-                        body.Add(NVector.Transform(new NVector(r.OrigVerts[i].x,r.OrigVerts[i].y,r.OrigVerts[i].z),r.ToReference),alpha[i]);
-            }
-        }
-        foreach(var pair in alphaByRecord)
-        {
-            var r=pair.Key;var alpha=pair.Value;
+            if(r.Virtual!=null || !CanBindVirtual(r))continue;
+            // Keep the raw material weights reusable. Clothing samples its own
+            // copy so the next body-field revision cannot compound old sampling.
+            var alpha=(float[])MaterialAlpha(state,r,stage,inverseFrame).Clone();
             if(r.IsCloth)
                 for(int i=0;i<alpha.Length;i++)
                 {
                     if(alpha[i]<=0)continue;
                     var o=NVector.Transform(new NVector(r.OrigVerts[i].x,r.OrigVerts[i].y,r.OrigVerts[i].z),r.ToReference);
-                    alpha[i]=body.Sample(o,alpha[i]);
+                    alpha[i]=state.Virtual.BodyMaterial.Sample(o,alpha[i]);
                 }
             for(int i=0;i<alpha.Length;i++)
                 if(BreastExclusion.Contains(r.BreastExcluded,i) || BodyProtection.Keep(r.ProtectionKeep,i)==0)alpha[i]=0;
@@ -189,13 +189,37 @@ internal static partial class BellyVertexMorph
             renderer.quality=SkinQuality.Bone4;
             // Keep the skin update alive while recovering from an old culled frame.
             renderer.updateWhenOffscreen=true;
+            attached++;
             Log.LogInfo($"[VirtualAxis] mesh={mesh.name} virtualVertices={alpha.Count(x=>x>0)} paletteStart={index} virtualSlots={recipeCount}; exact four-weight factorization");
             if(binding.Skirt!=null)Log.LogInfo($"[SkirtDrape] mesh={mesh.name} bones={binding.Skirt.Plan.Controlled.Count(x=>x)} released={binding.Skirt.Plan.Released.Count(x=>x)} slots={recipeCount}; bind-space area-weighted support; native rotations retained");
         }
         if(!records.Any(r=>r.Virtual!=null)){state.Virtual=null;return;}
-        Log.LogInfo($"[VirtualAxis] stage={stage:F3} pelvis={state.Virtual.Pelvis.name} spine={state.Virtual.Spine.name} anchor={reference.Anchor} upper={reference.Upper}; no hierarchy bones added");
+        if(newRig || attached>0)
+            Log.LogInfo($"[VirtualAxis] stage={stage:F3} pelvis={state.Virtual.Pelvis.name} spine={state.Virtual.Spine.name} anchor={state.Virtual.Reference.Anchor} upper={state.Virtual.Reference.Upper}; attached={attached} rig={(newRig ? "new" : "reused")}; no hierarchy bones added");
         // Rest-height attachment replaces the per-pose geometric support pass.
         UpdateVirtualState(state,records);
+    }
+
+    private static bool CanBindVirtual(MeshRecord record) => record.Renderer!=null && record.Renderer.enabled &&
+        record.Renderer.gameObject.activeInHierarchy && record.Renderer.sharedMesh==record.Mesh &&
+        record.LastNewV!=null && record.ActualMoved>0;
+
+    private static float[] MaterialAlpha(CharaState state,MeshRecord record,float stage,NMatrix inverseFrame)
+    {
+        if(record.VirtualAlpha!=null)return record.VirtualAlpha;
+        var settings=BellyDeformSettings.Vtx;
+        var alpha=new float[record.OrigVerts.Length];
+        for(int i=0;i<alpha.Length;i++)
+        {
+            var o=NVector.Transform(new NVector(record.OrigVerts[i].x,record.OrigVerts[i].y,record.OrigVerts[i].z),record.ToReference);
+            var n=NVector.Transform(new NVector(record.LastNewV[i].x,record.LastNewV[i].y,record.LastNewV[i].z),record.ToReference);
+            var material=NVector.Transform(o,inverseFrame);
+            alpha[i]=VirtualAxisMath.MaterialSurfaceWeight(NVector.Distance(o,n),material,state.Profile,stage,settings,
+                BellyShape.DeformationInfluence(record.BellyInfluence==null ? 1 : record.BellyInfluence[i],material,state.Profile,settings));
+            alpha[i]*=BodyProtection.Keep(record.ProtectionKeep,i);
+            if(BreastExclusion.Contains(record.BreastExcluded,i) || settings.VirtualAxisStrength<=0)alpha[i]=0;
+        }
+        return record.VirtualAlpha=alpha;
     }
 
     // Called after the game's Human.LateUpdate, plus once immediately on rebuild.
@@ -213,6 +237,7 @@ internal static partial class BellyVertexMorph
                     state.VirtualPending=false;
                     try { PrepareVirtual(state,records,state.LastAppliedRate,human); }
                     catch(Exception e) { ReleaseVirtual(records);state.Virtual=null;Log.LogError("[VirtualAxis] Setup failed; native skinning retained: "+e); }
+                    finally { FinishRebuild(state); }
                 }
                 else UpdateVirtualState(state,records);
             }
@@ -235,6 +260,7 @@ internal static partial class BellyVertexMorph
                 if(binding?.Skirt!=null && (binding.Renderer==null || binding.Renderer.sharedMesh!=binding.Mesh))
                 {binding.Restore();r.Virtual=null;continue;}
                 if(binding==null || binding.Renderer==null || binding.Renderer.sharedMesh!=binding.Mesh)continue;
+                if(!binding.Renderer.enabled || !binding.Renderer.gameObject.activeInHierarchy)continue;
                 var virtualMesh=r.ToReference*rig.Last.Transform;bool changed=false;binding.Tick++;
                 NMatrix Native(int index)
                 {

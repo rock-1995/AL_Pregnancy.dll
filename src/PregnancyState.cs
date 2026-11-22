@@ -93,6 +93,9 @@ public sealed class PregnancyRecord
     public int Births { get; set; }
     public string LastFatherName { get; set; } = "";
     public long LastBirthDay { get; set; } = -1;
+    // Authoritative appearance values live in the save's companion file. A null
+    // value identifies a record created before appearance sliders were introduced.
+    public AppearanceValues Appearance { get; set; }
     [JsonIgnore] public bool IsPregnant => Pregnant;
     public bool CanConceive(PregnancyRules rules) => !IsPregnant && (RecoveryProgress >= 1 || rules.RecoveryDays <= 0);
     public double GestationDays(PregnancyRules rules) => Math.Clamp(rules.GestationDays, 1, 1000);
@@ -123,7 +126,7 @@ public static class CyclePhase
 
 public sealed class PregnancyWorld
 {
-    public int Version { get; set; } = 3;
+    public int Version { get; set; } = 4;
     public string WorldId { get; set; } = Guid.NewGuid().ToString("N");
     public long ElapsedDays { get; set; }
     public Dictionary<string, PregnancyRecord> Characters { get; set; } = new(StringComparer.Ordinal);
@@ -139,13 +142,14 @@ public sealed class PregnancyWorld
     public PregnancyRecord Register(string key, string name, int initialDay)
     {
         if (!Characters.TryGetValue(key, out var value))
-            Characters.Add(key, value = new PregnancyRecord { Key = key, Name = name, CycleDay = Math.Clamp(initialDay, 1, 28) });
+            Characters.Add(key, value = new PregnancyRecord { Key = key, Name = name,
+                CycleDay = Math.Clamp(initialDay, 1, 28), Appearance = new AppearanceValues() });
         if (!string.IsNullOrWhiteSpace(name)) value.Name = name;
         return value;
     }
     public void Validate()
     {
-        if (Version != 3 || string.IsNullOrWhiteSpace(WorldId) || ElapsedDays < 0 || Characters == null || CardCycleProgress == null)
+        if (Version != 4 || string.IsNullOrWhiteSpace(WorldId) || ElapsedDays < 0 || Characters == null || CardCycleProgress == null)
             throw new InvalidDataException("Unsupported or invalid pregnancy world.");
         foreach (var item in Characters)
         {
@@ -154,7 +158,8 @@ public sealed class PregnancyWorld
                 !Unit(p.PregnancyProgress) || !Unit(p.RecoveryProgress) || !Unit(p.Residual) ||
                 !Unit(p.GestationVariationSample) ||
                 !double.IsFinite(p.GrowthStartScale) || p.GrowthStartScale <= 0 || p.GrowthStartScale > 280 ||
-                (!p.Pregnant && p.PregnancyProgress != 0) || (p.Pregnant && p.RecoveryProgress != 1))
+                (!p.Pregnant && p.PregnancyProgress != 0) || (p.Pregnant && p.RecoveryProgress != 1) ||
+                p.Appearance == null || !Unit(p.Appearance.Belly) || !Unit(p.Appearance.Body))
                 throw new InvalidDataException("Invalid character pregnancy record: " + item.Key);
         }
         if (CardCycleProgress.Any(x => !Unit(x.Value) || x.Value >= 1)) throw new InvalidDataException("Invalid card cycle.");

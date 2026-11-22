@@ -25,7 +25,7 @@ internal static partial class BellyVertexMorph
         internal Vector3[] OrigVerts, LastNewV;
         internal bool[] BreastExcluded;
         internal float[] ProtectionKeep;
-        internal float[] BellyInfluence;
+        internal float[] BellyInfluence, VirtualAlpha;
         internal int[] NormalWeldGroup;
         internal NMatrix ToReference = NMatrix.Identity;
     }
@@ -38,12 +38,13 @@ internal static partial class BellyVertexMorph
         internal TorsoProfile Profile;
         internal LocalFrame Frame;
         internal SkinnedMeshRenderer SMR;
-        internal int PelvisIdx;
+        internal int PelvisIdx, SurfaceRevision;
         internal IntPtr HumanPtr;
     }
     private static readonly Dictionary<long, CharaState> _state = new();
     private static readonly Dictionary<long, List<MeshRecord>> _records = new();
     private static readonly TestLog Log = new();
+    private static void FinishRebuild(CharaState state) { } // Timing-only reporting is outside this binding harness.
     private static NVector[] ToManagedVectors(Vector3[] v) => Array.ConvertAll(v, p => (NVector)p);
     private static Vector3[] ToUnityVectors(NVector[] v) => Array.ConvertAll(v, p => (Vector3)p);
     private static int Sig(Vector3[] v) { var h = new HashCode(); foreach(var p in v)h.Add((NVector)p); return h.ToHashCode(); }
@@ -134,6 +135,7 @@ internal static partial class BellyVertexMorph
             ReleaseVirtual(records);
             Program.Check(renderer.bones.SequenceEqual(bones)&&mesh.bindposes.SequenceEqual(binds)&&mesh.boneWeights.SequenceEqual(native),"release restores native binding");
             Program.Check(mesh.vertices.SequenceEqual(record.LastNewV)&&record.AppliedSig==Sig(record.LastNewV),"release restores direct vertices and signature");
+            state.Virtual=null; record.VirtualAlpha=null; // Shape changes invalidate these caches in production.
             PrepareVirtual(state,records,1);
             Program.Check(renderer.bones.Length==palette,"rebuild does not grow palette");
             if(strength>0)
@@ -141,17 +143,19 @@ internal static partial class BellyVertexMorph
                 var beforeBlend=(float[])record.Virtual.Blend.Clone();
                 float start=BellyDeformSettings.Vtx.LowerTransitionStart;
                 BellyDeformSettings.Vtx.LowerTransitionStart=.75f;
-                ReleaseVirtual(records);state.Virtual=null;state.VirtualPending=true;
+                ReleaseVirtual(records);state.Virtual=null;record.VirtualAlpha=null;state.VirtualPending=true;
                 UpdateVirtual(human);
                 Program.Check(beforeBlend.Where((a,i)=>Math.Abs(a-record.Virtual.Blend[i])>1e-5f).Any(),"Lower start change reaches the rebuilt production binding");
                 Program.Check(state.Virtual.LowerStart==.75f,"diagnostic snapshot reports the installed Lower start");
                 ReleaseVirtual(records);state.Virtual=null;BellyDeformSettings.Vtx.LowerTransitionStart=start;
+                record.VirtualAlpha=null; // Shape changes invalidate this cache in production.
                 PrepareVirtual(state,records,1);
             }
             var replacement=new Mesh {name="replacement"};renderer.sharedMesh=replacement;
             UpdateVirtualState(state,records);
             Program.Check(record.Virtual==null&&renderer.sharedMesh==replacement&&mesh.vertices.SequenceEqual(record.LastNewV),"replacement restores old skirt without touching new mesh");
             renderer.sharedMesh=mesh;renderer.bones=bones;
+            state.Virtual=null; record.VirtualAlpha=null; // Shape changes invalidate these caches in production.
             PrepareVirtual(state,records,1);
             // Simulate missing native physics bone. Production failure path must
             // restore all binding and residual writes, not leave a collapsed hem.
@@ -159,6 +163,7 @@ internal static partial class BellyVertexMorph
             UpdateVirtualState(state,records);
             Program.Check(record.Virtual==null&&mesh.vertices.SequenceEqual(record.LastNewV),"failure restores direct geometry");
             bones[1]=new Transform {name="cf_j_sk_00_00",localToWorldMatrix=binds[1].inverse};
+            state.Virtual=null; record.VirtualAlpha=null;
             PrepareVirtual(state,records,0);
             Program.Check(state.Virtual==null&&record.Virtual==null,"zero stage leaves no binding");
             _state.Clear();_records.Clear();

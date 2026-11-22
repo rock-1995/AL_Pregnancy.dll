@@ -125,7 +125,7 @@ internal static class PregnancyLiveRegression
         var migrationRules = new PregnancyRules { RecoveryDays = 180, GestationDays = 280 };
         var migrated = PregnancyStorage.Load(slot, "", out _, migrationRules);
         var old = migrated.Characters["old"];
-        check("Legacy days migrate to normalized pregnancy preserving identity/history", migrated.Version == 3 && old.Pregnant && old.PregnancyProgress == .5 && old.FatherName == "Dad" && old.Births == 2 && Near(migrated.CardCycleProgress["card"], 17d / 28));
+        check("Legacy days migrate to normalized pregnancy preserving identity/history", migrated.Version == 4 && old.Pregnant && old.PregnancyProgress == .5 && old.FatherName == "Dad" && old.Births == 2 && Near(migrated.CardCycleProgress["card"], 17d / 28));
         double oldT = (150d - 40) / (300 - 40);
         check("Legacy migration preserves the preexisting belly growth curve", Math.Abs(old.Growth(40) - oldT * oldT * (3 - 2 * oldT)) < 1e-6);
         check("Legacy remaining recovery migrates using current configured length", migrated.Characters["recover"].RecoveryProgress == .5);

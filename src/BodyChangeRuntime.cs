@@ -1,4 +1,5 @@
 using Character;
+using HarmonyLib;
 using UnityEngine;
 
 namespace ALPregnancy;
@@ -18,10 +19,18 @@ internal static class BodyChangeRuntime
         internal HumanDataBody Working;
         internal BodyChangeValues Last;
         internal BodyChangeValues Original;
+        internal BodyChangeValues ReadBuffer, ApplyBuffer;
+        internal Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<float> WorkingShape;
         internal BodyChangeCovers Covers;
         internal Scope Active;
         internal bool NativeShapeDirty;
         internal bool AnimatorParametersDirty;
+        internal bool Applied;
+        internal IntPtr CustomPointer, SourcePointer;
+        internal BodyChangeValues Delta;
+        internal double Progress;
+        internal int Lower, Upper;
+        internal float ColorMaximum;
     }
 
     // The saved body object and its arrays are never edited. The replacement exists
@@ -97,9 +106,53 @@ internal static class BodyChangeRuntime
             entry.NativeShapeDirty = true;
     }
 
-    internal static void ApplyAfterBelly(Human human, PregnancyRecord record)
+    // Do not patch ChangeBustSpring/Gravity/AreolaSize/Softness directly. Their
+    // Nullable<float> arguments are eight-byte VALUES in the Win64 ABI, while
+    // this interop's Harmony trampoline treats them as pointers. None becomes a
+    // null memcpy source before the postfix can run. Observe the parameterless
+    // native batch instead; direct maker edits are also caught by SourceMatches.
+    internal static void InstallDirtyTracking(Harmony harmony)
     {
-        var scope = BeginAfterBelly(human, record);
+        harmony.Patch(AccessTools.Method(typeof(HumanBody), nameof(HumanBody.LateUpdate), Type.EmptyTypes),
+            prefix: new HarmonyMethod(typeof(BodyChangeRuntime), nameof(BeforeNativeBodyLateUpdate)) { priority = Priority.First });
+        // Maker invokes inlined native setters directly, without the batch flags.
+        // Its int/float actions are safe ABI boundaries and also catch a reset
+        // which writes the same source value but replaces our visual override.
+        harmony.Patch(AccessTools.Method(typeof(CharacterCreation.UI.View.Body.Softness.SoftnessEdit), "_CreateCategory_b__15_3", new[] { typeof(int), typeof(float) }),
+            postfix: new HarmonyMethod(typeof(BodyChangeRuntime), nameof(AfterMakerSoftness)));
+        harmony.Patch(AccessTools.Method(typeof(CharacterCreation.UI.View.Body.Breast.BreastEdit), "_CreateCategory_b__8_7", new[] { typeof(int), typeof(float) }),
+            postfix: new HarmonyMethod(typeof(BodyChangeRuntime), nameof(AfterMakerBreast)));
+        harmony.Patch(AccessTools.Method(typeof(CharacterCreation.UI.View.Body.Breast.Nip.NipEdit), "_CreateCategory_b__8_4", new[] { typeof(int), typeof(float) }),
+            postfix: new HarmonyMethod(typeof(BodyChangeRuntime), nameof(AfterMakerNip)));
+    }
+
+    private static void AfterMakerSoftness(CharacterCreation.UI.View.Body.Softness.SoftnessEdit __instance) => NativeShapeUpdated(__instance?._humanBody);
+    private static void AfterMakerBreast(CharacterCreation.UI.View.Body.Breast.BreastEdit __instance) => NativeShapeUpdated(__instance?._humanBody);
+    private static void AfterMakerNip(CharacterCreation.UI.View.Body.Breast.Nip.NipEdit __instance) => NativeShapeUpdated(__instance?._humanBody);
+
+    internal static void BeforeNativeBodyLateUpdate(HumanBody __instance)
+    {
+        var human = __instance?._human;
+        if (human == null || !Entries.TryGetValue(human.Pointer, out var entry) ||
+            entry.BodyPointer != __instance.Pointer || entry.Active != null) return;
+        // AL's real LateUpdate consumes these pending flags, including its
+        // inlined bust/softness refreshes, then clears them. Snapshot before it
+        // does so. Empty/stable frames keep the no-copy fast path.
+        if (__instance._isUpdateBustSize) { entry.NativeShapeDirty = true; return; }
+        var groups = __instance._updateShakeFlags;
+        if (groups == null) return;
+        for (int i = 0; i < groups.Length; i++)
+        {
+            var flags = groups[i];
+            if (flags == null) continue;
+            for (int j = 0; j < flags.Length; j++)
+                if (flags[j]) { entry.NativeShapeDirty = true; return; }
+        }
+    }
+
+    internal static void ApplyAfterBelly(Human human, double progress)
+    {
+        var scope = BeginAfterBelly(human, progress);
         End(human, scope);
         if (human != null && Entries.TryGetValue(human.Pointer, out var entry) && entry.AnimatorParametersDirty &&
             BodyChangeAnimation.RefreshAnimatorParameters(human)) entry.AnimatorParametersDirty = false;
@@ -116,41 +169,57 @@ internal static class BodyChangeRuntime
             human.Disposed || human.IsReloading || !human.HiPoly || human.Sex != 1 ||
             human.GameObject == null || !human.GameObject.activeInHierarchy || human.Body?.Pointer != body.Pointer ||
             !Entries.TryGetValue(human.Pointer, out var entry) || entry.BodyPointer != body.Pointer ||
-            entry.Last == null || entry.Active != null)
+            !entry.Applied || entry.Last == null || entry.Active != null)
             return null;
         var owner = human.Data?.Custom;
-        if (owner?.Body == null) return null;
+        if (owner?.Body == null || owner.Pointer != entry.CustomPointer || owner.Body.Pointer != entry.SourcePointer) return null;
         var scope = new Scope(owner, entry.Working, entry.Covers, human);
         entry.Active = scope;
         return scope;
     }
 
-    internal static Scope BeginAfterBelly(Human human, PregnancyRecord record)
+    internal static Scope BeginAfterBelly(Human human, double progress)
     {
         if (human == null) return null;
         if (Entries.TryGetValue(human.Pointer, out var running) && running.Active != null) return null;
-        if (!PregnancyPlugin.Enabled.Value || PregnancyController.ManualPreviewActive || record == null ||
+        if (!PregnancyPlugin.Enabled.Value || PregnancyController.ManualPreviewActive ||
             human.Disposed || human.IsReloading || !human.HiPoly || human.Sex != 1 ||
             human.GameObject == null || !human.GameObject.activeInHierarchy || human.Body?.SibBody == null)
         { Release(human); return null; }
         RefreshCards();
-        double progress = BodyChangeMath.Progress(record.IsPregnant, record.PregnancyProgress, record.Births, PregnancyConfig.BodyBirths.Value);
         if (_delta == null || progress == 0) { Release(human); return null; }
         var owner = human.Data?.Custom;
         if (owner?.Body?.shapeValueBody == null) return null;
-        var original = BodyChangeValues.Read(owner.Body);
-        original.Validate();
-        var target = original.Apply(_delta, progress, PregnancyConfig.BodyLower.Value,
-            PregnancyConfig.BodyUpper.Value, PregnancyConfig.NippleColorMaximum.Value);
         Entries.TryGetValue(human.Pointer, out var entry);
-        var covers = BodyChangeCovers.Prepare(entry?.Covers, BodyChangeCovers.Current(human),
-            _delta.Shape, progress, PregnancyConfig.BodyLower.Value, PregnancyConfig.BodyUpper.Value);
-        if (target.Same(original) && covers?.HasChanges != true) { Release(human); return null; }
-        if (entry == null || entry.BodyPointer != human.Body.Pointer)
+        if (entry != null && (entry.BodyPointer != human.Body.Pointer ||
+            entry.CustomPointer != owner.Pointer || entry.SourcePointer != owner.Body.Pointer))
         {
             Release(human);
-            Entries[human.Pointer] = entry = new Entry { Human = human, BodyPointer = human.Body.Pointer, Working = new HumanDataBody() };
+            entry = null;
         }
+        int lower = PregnancyConfig.BodyLower.Value, upper = PregnancyConfig.BodyUpper.Value;
+        float colorMaximum = PregnancyConfig.NippleColorMaximum.Value;
+        var covers = BodyChangeCovers.Prepare(entry?.Covers, BodyChangeCovers.Current(human),
+            _delta.Shape, progress, lower, upper);
+        // Compare live values without copying them. Native/other-plugin array and
+        // field writes can bypass every managed setter, so dirty hooks alone are
+        // insufficient. Cover comparison also catches edits made in place.
+        if (entry != null && !entry.NativeShapeDirty && entry.Progress == progress &&
+            ReferenceEquals(entry.Delta, _delta) && entry.Lower == lower && entry.Upper == upper &&
+            entry.ColorMaximum == colorMaximum && ReferenceEquals(covers, entry.Covers) &&
+            SourceMatches(owner.Body, entry.Original)) return null;
+        var original = BodyChangeValues.Read(owner.Body, entry?.ReadBuffer);
+        original.Validate();
+        var target = original.Apply(_delta, progress, lower, upper, colorMaximum, entry?.ApplyBuffer);
+        bool applies = !target.Same(original) || covers?.HasChanges == true;
+        if (!applies && entry?.Applied == true)
+        {
+            Release(human);
+            entry = null;
+        }
+        if (entry == null)
+            Entries[human.Pointer] = entry = new Entry { Human = human, BodyPointer = human.Body.Pointer,
+                CustomPointer = owner.Pointer, SourcePointer = owner.Body.Pointer };
         if (entry.Active != null) return null; // Defensive against a reentrant native update.
         bool coversChanged = !ReferenceEquals(covers, entry.Covers);
         entry.Covers = covers;
@@ -158,14 +227,29 @@ internal static class BodyChangeRuntime
         bool nativeChanged = entry.NativeShapeDirty;
         bool changed = !target.Same(entry.Last) || sourceChanged || nativeChanged || coversChanged;
         bool shapeChanged = entry.Last == null || !target.Shape.SequenceEqual(entry.Last.Shape) || coversChanged;
+        var previous = entry.Last ?? original;
+        var previousOriginal = entry.Original;
+        entry.Delta = _delta; entry.Progress = progress;
+        entry.Lower = lower; entry.Upper = upper; entry.ColorMaximum = colorMaximum;
+        if (!applies)
+        {
+            // Remember a fully clamped/zero delta too. It must not cause an
+            // allocation and full read/recalculation on every subsequent frame.
+            entry.Last = target; entry.Original = original;
+            entry.ReadBuffer = previousOriginal;
+            entry.ApplyBuffer = ReferenceEquals(previous, original) ? null : previous;
+            entry.NativeShapeDirty = false;
+            return null;
+        }
+        entry.Working ??= new HumanDataBody();
         entry.Working.Copy(owner.Body);
-        target.Write(entry.Working);
+        target.Write(entry.Working, ref entry.WorkingShape);
         var scope = new Scope(owner, entry.Working, entry.Covers, human);
         entry.Active = scope;
-        var previous = entry.Last ?? original;
         // Record the attempted target before any native setter, so a partial native
         // failure restores every potentially touched parameter as well as the data.
         entry.Last = target;
+        entry.Applied = true;
         try
         {
             if (changed)
@@ -183,10 +267,25 @@ internal static class BodyChangeRuntime
                 entry.NativeShapeDirty = false;
             }
             entry.Original = original;
+            // Retain separate current/previous snapshots until all native setters
+            // finish; only then may the old buffers become scratch for a later call.
+            entry.ReadBuffer = previousOriginal;
+            entry.ApplyBuffer = ReferenceEquals(previous, original) ? null : previous;
             entry.AnimatorParametersDirty |= shapeChanged;
             return scope;
         }
         catch { End(human, scope); Release(human); throw; }
+    }
+
+    private static bool SourceMatches(HumanDataBody source, BodyChangeValues original)
+    {
+        if (original == null || !source.shapeValueBody.AsSpan().SequenceEqual(original.Shape)) return false;
+        var extra = original.Extra;
+        return source.bustSoftness == extra[0] && source.bustWeight == extra[1] &&
+            source.areolaSize == extra[2] && source.upperArmSoftness == extra[3] &&
+            source.bellySoftness == extra[4] && source.waistSoftness == extra[5] &&
+            source.hipSoftness == extra[6] && source.thighSoftness == extra[7] &&
+            source.nipColor.Equals(original.Nipple);
     }
 
     internal static void End(Human human, Scope scope)
@@ -222,7 +321,7 @@ internal static class BodyChangeRuntime
         entry.Active?.Dispose();
         try
         {
-            if (human.Disposed || human.Body?.Pointer != entry.BodyPointer || human.Data?.Custom?.Body == null) return;
+            if (!entry.Applied || human.Disposed || human.Body?.Pointer != entry.BodyPointer || human.Data?.Custom?.Body == null) return;
             var original = BodyChangeValues.Read(human.Data.Custom.Body);
             if (entry.Last != null) RefreshExtra(human.Body, original, entry.Last);
             human.Body._isUpdateShapeBodyValue = true;

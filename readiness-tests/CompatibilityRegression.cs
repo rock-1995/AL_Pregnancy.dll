@@ -41,13 +41,13 @@ internal static class CompatibilityRegression
             check("Optional failure cannot grant apply outside native completion", !MorphReadiness.TryBeginApply(h));
 
             var renderer = h.GameObject.Renderers[0];
-            source.isReadable = false;
+            source.isReadable = false; NativeClothingChanges.MarkTopology(h);
             warnings = log.Warnings.Count;
             check("Unreadable native body remains rejected after optional failure", !MorphReadiness.EnterNativeBoundary(h) && !MorphReadiness.TryBeginApply(h));
             check("Rejected unreadable body has a specific diagnostic", log.Warnings.Count == warnings + 1 && log.Warnings[^1].Contains("No readable torso"));
             MorphReadiness.EnterNativeBoundary(h);
             check("Repeated same actor rejection is logged once", log.Warnings.Count == warnings + 1);
-            source.isReadable = true;
+            source.isReadable = true; NativeClothingChanges.MarkTopology(h);
             var bone = renderer.bones[1];
             renderer.bones[1] = null!;
             check("Missing bone still rejects even with readable source", !MorphReadiness.EnterNativeBoundary(h) && log.Warnings[^1].Contains("Body bone 1 missing"));

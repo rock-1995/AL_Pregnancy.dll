@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace ALPregnancy;
 
-// A few native AL additional garments (including the heart waist chain) have
+// Native garments, including hosiery and additional waist pieces, can have
 // Read/Write disabled. Reconstruct a private readable mesh from the ORIGINAL
 // mesh's GPU buffers, never the renderer's posed/skinned output. Runs only when
 // acquiring a lease; restores the untouched shared source on release.

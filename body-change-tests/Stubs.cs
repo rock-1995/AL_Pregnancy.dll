@@ -19,7 +19,7 @@ namespace UnityEngine
 }
 namespace Il2CppInterop.Runtime.InteropTypes.Arrays
 {
-    public sealed class Il2CppStructArray<T> : List<T> { public Il2CppStructArray(IEnumerable<T> data):base(data){} }
+    public sealed class Il2CppStructArray<T> : List<T> { public Il2CppStructArray(IEnumerable<T> data):base(data){} public int Length=>Count; public Span<T> AsSpan()=>System.Runtime.InteropServices.CollectionsMarshal.AsSpan(this); }
 }
 namespace Il2CppSystem
 {
@@ -51,7 +51,7 @@ namespace Character
             hipSoftness=other.hipSoftness;thighSoftness=other.thighSoftness;nipColor=other.nipColor;skinId=other.skinId;
         }
     }
-    public sealed class HumanDataCustom { public HumanDataBody Body = new(); }
+    public sealed class HumanDataCustom : NativeObject { public HumanDataBody Body = new(); }
     public sealed class Parameter { public int sex=1; }
     public sealed class HumanData
     {
@@ -79,14 +79,14 @@ namespace Character
     {
         public HumanCloth Cloth=new();public HumanData Data=new();public HumanBody Body;public bool Disposed,IsReloading,HiPoly=true;public int Sex=1;
         public GameObject GameObject=new();
-        public Human() { Body=new(this); }
+        public static readonly List<Human> All=new(); public Human() { Body=new(this); All.Add(this); }
         public void Load() {} public void Reload() {} public void ReloadCoordinate() {} public void ReloadHead() {} public void ReloadHair() {} public void ReloadSkin() {} public void ReloadMannequin() {}
     }
     public sealed class HumanBody : NativeObject
     {
         public static class Define { public enum BodyShapeIdx { HipSizeY=41 } }
-        public bool _isUpdateShapeBodyValue,_isUpdateShapeBody,ThrowExtra;
-        public object SibBody=new(); public Human Human; public Human _human=>Human; public BodyEntry[] BodyRenderers = Array.Empty<BodyEntry>();
+        public bool _isUpdateShapeBodyValue,_isUpdateShapeBody,ThrowExtra,_isUpdateBustSize; public bool[][] _updateShakeFlags; public GameObject _objBody=new(); public Transform _objBone=new(); public void Load(Transform root,string name) {}
+        public object SibBody=new(); public Human Human; public Human _human=>Human; public NativeArray<BodyEntry> BodyRenderers = Array.Empty<BodyEntry>();
         internal BodyChangeValues Applied;public int ExtraCalls,ValueUpdates,ShapeUpdates;
         public readonly float[] AppliedExtras=new float[8];public Color AppliedNipple;
         public HumanBody(Human human) { Human=human; }
