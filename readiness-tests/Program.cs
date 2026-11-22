@@ -73,6 +73,7 @@ ar.gameObject.Renderers = Array.Empty<SkinnedMeshRenderer>();
 a.GameObject.Renderers = a.GameObject.Renderers.Concat(new[] { hair }).ToArray();
 Check("New excluded head/hair meshes do not rebuild the torso", Begin(a) && !lease.CheckChanges(MorphReadiness.CurrentMeshes(a)).Mesh && PregnancyRuntime.HumanReleases.GetValueOrDefault(a.Pointer) == beforeA); End();
 ar.bones[0] = new Transform();
+NativeClothingChanges.MarkTopology(a); // Native body load completion publishes a topology change.
 Check("Native bone replacement restores only this actor at completion", Begin(a) && PregnancyRuntime.HumanReleases.GetValueOrDefault(a.Pointer) == beforeA + 1); End();
 Check("Replaced skeleton is not repeatedly released", Begin(a) && PregnancyRuntime.HumanReleases.GetValueOrDefault(a.Pointer) == beforeA + 1); End();
 var replacement = new Mesh { name = "o_lower_type04" }; ar.sharedMesh = replacement;
@@ -96,25 +97,25 @@ var shared = Character();
 Check("Shared snapshot starts at its own actor boundary", Begin(shared));
 var snapshot = MorphReadiness.CurrentMeshes(shared);
 var sharedLease = new MeshLease(); int scans = shared.GameObject.Scans;
-sharedLease.Acquire(shared, snapshot);
+sharedLease.Acquire(shared, snapshot); MorphReadiness.RememberLeasedMeshes(shared);
 Check("Acquisition reuses boundary renderer selection", shared.GameObject.Scans == scans);
 Check("Snapshot cannot be borrowed by another actor", MorphReadiness.CurrentMeshes(a) == null);
 End();
-Check("Leaving boundary drops renderer references", snapshot.Count == 0 && MorphReadiness.CurrentMeshes(shared) == null);
+Check("Leaving boundary revokes access while retaining the cached snapshot", snapshot.Count == 1 && MorphReadiness.CurrentMeshes(shared) == null);
 shared.GameObject.Scans = 0;
-Check("Next native completion collects a fresh snapshot", Begin(shared));
+Check("Next native completion reuses the valid snapshot", Begin(shared));
 var sharedChanges = sharedLease.CheckChanges(MorphReadiness.CurrentMeshes(shared));
-Check("Readiness and lease checks perform exactly one hierarchy scan", shared.GameObject.Scans == 1 && !sharedChanges.Mesh && !sharedChanges.Visibility);
+Check("Stable readiness and lease checks avoid hierarchy scans", shared.GameObject.Scans == 0 && !sharedChanges.Mesh && !sharedChanges.Visibility);
 End();
 shared.GameObject.Renderers[0].enabled = false;
 shared.GameObject.Scans = 0; Begin(shared);
 sharedChanges = sharedLease.CheckChanges(MorphReadiness.CurrentMeshes(shared));
-Check("Visibility refresh uses the same single scan", sharedChanges.Visibility && !sharedChanges.Mesh && shared.GameObject.Scans == 1); End();
+Check("Cached visibility refresh avoids hierarchy scans", sharedChanges.Visibility && !sharedChanges.Mesh && shared.GameObject.Scans == 0); End();
 var garment = new SkinnedMeshRenderer { name = "shirt", sharedMesh = new Mesh { name = "shirt" } };
-shared.GameObject.Renderers = shared.GameObject.Renderers.Concat(new[] { garment }).ToArray(); Begin(shared);
+shared.GameObject.Renderers = shared.GameObject.Renderers.Concat(new[] { garment }).ToArray(); NativeClothingChanges.MarkTopology(shared); Begin(shared);
 Check("New garment is detected within its completed update", sharedLease.CheckChanges(MorphReadiness.CurrentMeshes(shared)).Mesh); End();
-sharedLease.Dispose(); Begin(shared); sharedLease.Acquire(shared, MorphReadiness.CurrentMeshes(shared)); End();
-shared.GameObject.Renderers = shared.GameObject.Renderers.Where(r => r != garment).ToArray(); Begin(shared);
+sharedLease.Dispose(); Begin(shared); sharedLease.Acquire(shared, MorphReadiness.CurrentMeshes(shared)); MorphReadiness.RememberLeasedMeshes(shared); End();
+shared.GameObject.Renderers = shared.GameObject.Renderers.Where(r => r != garment).ToArray(); NativeClothingChanges.MarkTopology(shared); Begin(shared);
 Check("Removed garment is detected without retaining a prior snapshot", sharedLease.CheckChanges(MorphReadiness.CurrentMeshes(shared)).Mesh); End();
 sharedLease.Dispose(); MorphReadiness.Forget(shared);
 Check("No test advanced a clock or frame", Time.frameCount == 0 && Time.unscaledTime == 0);
@@ -136,7 +137,7 @@ namespace UnityEngine
         public SkinnedMeshRenderer[] Renderers = Array.Empty<SkinnedMeshRenderer>();
         public T[] GetComponentsInChildren<T>(bool inactive) { Scans++; return Renderers.Cast<T>().ToArray(); }
     }
-    public class Mesh : Object { public string name; public HideFlags hideFlags; public int vertexCount = 100, subMeshCount = 1, blendShapeCount; public bool isReadable = true; public int[] bindposes = new int[2]; }
+    public class Mesh : Object { public string name; public HideFlags hideFlags; public int vertexCount = 100, subMeshCount = 1, blendShapeCount; public bool isReadable = true; public int[] bindposes = new int[2]; public int bindposeCount => bindposes.Length; }
     public class Transform : Object { }
     public class SkinnedMeshRenderer : Object { public string name; public Bounds localBounds; public Mesh sharedMesh; public bool enabled = true; public GameObject gameObject = new(); public Transform[] bones = new[] { new Transform(), new Transform() }; }
     public static class Time { public static float unscaledTime; public static int frameCount; }
@@ -145,7 +146,7 @@ namespace Il2CppSystem.Collections.Generic { public interface IReadOnlyCollectio
 namespace Character
 {
     public class BodyEntry { public SkinnedMeshRenderer Renderer; }
-    public class HumanBody { public BodyEntry[] BodyRenderers = Array.Empty<BodyEntry>(); }
+    public class HumanBody : UnityEngine.Object { public Human _human; public GameObject _objBody = new(); public Transform _objBone = new(); public NativeArray<BodyEntry> BodyRenderers = Array.Empty<BodyEntry>(); public void Load(Transform root, string name) {} }
     public class Human : UnityEngine.Object
     {
         public bool Disposed, IsReloading; public bool HiPoly = true; public int Sex = 1;
@@ -177,10 +178,10 @@ namespace HarmonyLib
     public class Harmony
     {
         public static int Hooks; public static bool PatchedByRef;
-        public void Patch(System.Reflection.MethodInfo method, HarmonyMethod prefix) { Hooks++; PatchedByRef |= method.GetParameters().Any(p => p.ParameterType.IsByRef); }
+        public void Patch(System.Reflection.MethodInfo method, HarmonyMethod prefix = null, HarmonyMethod postfix = null) { Hooks++; PatchedByRef |= method.GetParameters().Any(p => p.ParameterType.IsByRef); }
     }
     public class HarmonyMethod { public HarmonyMethod(Type t, string n) { } }
-    public static class AccessTools { public static List<System.Reflection.MethodInfo> GetDeclaredMethods(Type type) => type.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly).ToList(); }
+    public static class AccessTools { public static System.Reflection.MethodInfo Method(Type type,string name,Type[] args) => type.GetMethod(name,args); public static List<System.Reflection.MethodInfo> GetDeclaredMethods(Type type) => type.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly).ToList(); }
 }
 namespace ALPregnancy
 {
@@ -193,6 +194,7 @@ namespace ALPregnancy
     internal static class BodyMeshSelection
     {
         internal static readonly string[] PelvisNames = { "waist" }, SpineNames = { "spine" };
+        internal static void Register(Human human) {}
         internal static int FindBone(Transform[] bones, string[] names) => names == PelvisNames ? 0 : 1;
     }
     internal static class PregnancyRuntime
