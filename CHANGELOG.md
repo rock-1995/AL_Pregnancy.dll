@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.3.5
+
+- Give the native character-editor pregnancy controls the game's blue panel background and standard two-line slider layout. Keep both rows at the native height with consistent spacing to prevent overlapping labels.
+- Preserve the native numeric-input, reset and Undo bindings. This is a layout change; appearance values, pregnancy progression and save behavior are unchanged.
+- Build verified; the revised layout still needs an in-game visual recheck.
+
+## 0.3.4
+
+- Add the optional low-detail belly input bridge used by AL Collision Plus 0.2.0. It refreshes pregnancy inputs for native breast collision when liquid helpers are inactive, without enabling liquid GameObjects or changing the native fluid mesh submission/Obi path.
+- Retain the 0.3.3 body, clothing, gameplay and save behavior. No new pregnancy setting or preset migration is required for this bridge.
+
+## 0.3.3
+
+- Create private readable copies for every recognized unreadable garment, including native pantyhose waist/abdomen panels, instead of limiting this path to supplemental slots. Reuse valid copies across clothing visibility changes.
+
+## 0.3.2
+
+- Restore pose-following when native clothing updates replace a garment's `sharedMesh`; rebind only changed garments while retaining valid body and clothing state.
+
+## 0.3.0–0.3.1
+
+- Add the native character-editor **妊娠** page with separate **お腹** and **体型** appearance sliders. Confirmed in-game edits persist through the normal save; cancelled edits and standalone creator previews do not write character cards.
+- Store appearance values in companion-save format v4. Migrate v1–v3 in memory and write v4 on the next normal save. Version 0.2.44 cannot read v4; keep paired native-save/sidecar backups before upgrading.
+- Publish appearance changes from pregnancy progression, birth history and relevant settings, while reducing repeated stable-frame body-data copies and native refresh work.
+- Coalesce native clothing notifications at the completed Human update and preserve unchanged mesh leases, virtual bindings and collision state. Retain the original deformation, protection and native skinning behavior.
+
+## 0.2.45–0.2.47 (local updates)
+
+- Cache exact garment-to-body correspondence while its source geometry and transform remain unchanged, reusing the established nearest-vertex result.
+- Reduce repeated collision-reader scratch allocations and retain completed-update collision scheduling.
+
 ## 0.2.44
 
 - Apply template body-slider changes to enabled clothing shape corrections, using each garment's original correction values and the existing progression and slider limits.

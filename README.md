@@ -1,6 +1,6 @@
 # AL Pregnancy
 
-**Version 0.2.44** — a BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
+**Version 0.3.5** — a BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
 
 Pregnancy progresses with game days and drives a growing belly, clothing deformation, pose response, and optional body changes based on childbirth history. Use **F1** for global settings through a compatible configuration manager and **F8** for character state and manual shape preview.
 
@@ -17,6 +17,8 @@ Pregnancy progresses with game days and drives a growing belly, clothing deforma
 - Synchronization with existing low-detail body/fluid collision meshes and Obi mesh indices.
 - Optional body changes using the difference between two character cards, applied to each character's own original body and enabled clothing shape corrections.
 - F8 character/debug controls, manual preview, unrestricted finite numeric shape input, and diagnostic export.
+- A native character-editor **妊娠** tab with separate belly and body-progression appearance sliders.
+- Optional integration with [AL Collision Plus 0.2.0](https://github.com/rock-1995/AL_CollisionPlus/releases/tag/v0.2.0) for native breast/belly contact.
 
 ## Pregnancy gameplay and F1
 
@@ -79,12 +81,20 @@ Breast protection is enabled by default; optional upper-bone filtering and upper
 
 ## Saving settings and gameplay state
 
+### Native character-editor appearance controls
+
+The **妊娠** tab adds **お腹** (belly) and **体型** (body progression), each from 0 to 1. These change appearance without directly changing pregnancy progress or birth count. In an in-game character edit, confirm the edit and use the normal game save to keep it; cancelling the edit does not commit it. In the standalone creator, these controls are previews and are not written into character cards.
+
+Pregnancy progression, birth-history changes, and relevant growth/body settings publish updated appearance values. The existing F8 preview remains a separate temporary preview.
+
+### Files and persistence
+
 | Data | Location | Persistence |
 | --- | --- | --- |
 | F1 global settings | `BepInEx/config/local.al.pregnancy.preview.cfg` | BepInEx configuration. |
 | Belly preset | `BepInEx/config/ALPregnancy_belly.json` | Loaded at startup; explicit values override defaults. |
 | F8 shape edits | Running session | Live only; use the belly preset to retain edits across sessions. |
-| Pregnancy state | `<native-save-path>.alpregnancy.json` | Written alongside the selected native save when the game saves. |
+| Pregnancy state and appearance values | `<native-save-path>.alpregnancy.json` | Format v4; written alongside the selected native save when the game saves. |
 | Diagnostic export | `BepInEx/plugins/AL_Pregnancy/diagnostics/latest-mesh.json` | **Write diagnostic log** exports settings and mesh data. |
 
 Values in the belly preset override the built-in defaults. To set only forward fullness persistently, edit `vtx.growthFullness` in that file; the current default is `1.10`.
@@ -92,6 +102,8 @@ Values in the belly preset override the built-in defaults. To set only forward f
 To retain a tuned F8 shape, export diagnostics, copy the exported `settings` object into the preset's `vtx` object, preserve its wrapper (`version: 5`, `startDay: 40`), and save it at `BepInEx/config/ALPregnancy_belly.json` before restarting. The shipped preset shows the full format. `startDay` is retained for compatibility; it is not the current F1 growth schedule.
 
 Pregnancy state belongs to its matching native save. Debug changes persist when you save through the game; a mismatched or damaged sidecar is rejected and reported in the BepInEx log.
+
+Older v1–v3 sidecars migrate in memory and are written as v4 on the next normal save. Keep a paired backup of the native save and its sidecar before upgrading from 0.2.x. **0.2.44 cannot read a v4 sidecar**; downgrading to that version requires a compatible paired backup.
 
 ## Optional body changes: template cards
 
@@ -116,11 +128,15 @@ F1 creator-value limits default to **0 / 100**, accept unrestricted integers, an
 
 ## Clothing, skirts, and collision
 
-Supported garments follow the body field, including supplemental `add_etc`, `add_arm`, and `add_leg` slots. Some CPU-unreadable supplemental meshes are reconstructed from original GPU buffers once per mesh lease. Failed readback and unsupported unreadable blend-shape meshes stay unchanged and log `[Clothing] Cannot read`. Acquiring a mesh may briefly synchronize the GPU during outfit changes.
+Supported garments follow the body field, including supplemental `add_etc`, `add_arm`, and `add_leg` slots. Recognized CPU-unreadable garments, including pantyhose waist/abdomen panels, use private readable copies reconstructed from original GPU buffers. These copies are reused while their mesh lease remains valid. Failed readback and unsupported unreadable blend-shape meshes stay unchanged and log `[Clothing] Cannot read`. Acquiring a mesh may briefly synchronize the GPU during outfit changes.
+
+Native clothing changes are collected at the completed character update, retaining unchanged garments and bindings. If the game replaces a garment's `sharedMesh`, the plugin rebuilds that garment's binding so it continues following the body pose.
 
 Skirts use native chain hierarchy, support/release zones, and per-influence bind compensation. Lower hems retain native bone response; no separate skirt setup is needed in F8. Free accessories are not automatically treated as garments. Third-party outfits can still need individual compatibility work.
 
 Low-detail collision meshes use their own skin weights with shared deformation/pose logic; existing Obi cache/index synchronization remains in place. This updates existing collision surfaces, not a guarantee of intersection-free animation or fluid behavior in every outfit and pose.
+
+**AL Collision Plus 0.2.0 is optional.** When installed, its native breast physics can request current belly collision inputs even while the game's liquid collision helpers are inactive. This bridge does not enable those helpers or submit extra liquid meshes; fluid contact continues through the existing native SkinnedCollisionHelper/Obi path. Use Pregnancy 0.3.4 or later with Collision Plus 0.2.0. The native sphere/capsule contact envelope differs from the older triangle-based Collision Plus solver.
 
 ## Troubleshooting and validation limits
 
@@ -136,7 +152,7 @@ See [Validation](VERIFICATION.txt) for tested coverage and [Changelog](CHANGELOG
 
 ## Build and test
 
-Requires Windows, **.NET SDK 10**, and local BepInEx/game interop assemblies. The plugin targets .NET 6; tests target .NET 10. Game, Unity, Obi, BepInEx, and IL2CPP assemblies are not included. The first build may restore framework reference packs.
+Requires Windows, **.NET SDK 10**, and local BepInEx/game interop assemblies. The plugin targets .NET 6; tests target .NET 6 or 10. Tests also use **PowerShell 7** and **Python 3** to extract small methods from the current production source. Game, Unity, Obi, BepInEx, and IL2CPP assemblies are not included. The first build may restore framework reference packs.
 
 ```powershell
 ./Build.ps1 -GameDir 'D:\Games\AmanatsuLocation'
@@ -145,7 +161,7 @@ Requires Windows, **.NET SDK 10**, and local BepInEx/game interop assemblies. Th
 
 The build prefers `BepInEx/interop-AmanatsuLocation/interop`, otherwise `BepInEx/interop`; override with `-InteropDir` on Build.ps1. Alternatively use `dotnet build src/AL_Pregnancy.csproj -c Release -p:GameDir="D:\Games\AmanatsuLocation"`, or set `AL_GAME_DIR`. Output: `src/bin/Release/net6.0/AL_Pregnancy.dll`.
 
-Test.ps1 runs ten offline suites: breast-physics ownership/axis driver, unrestricted inputs, main shape/gameplay/defaults, collision cache, readiness, mesh lifetime, shared-source lifetime, clothing readback, skirts, and body changes. Main tests need local BepInEx.Core; the others use test doubles. Full game-geometry captures are not distributed or required. Optional asset replay needs a separately supplied matching fixture.
+Test.ps1 runs sixteen offline suites covering breast ownership/axis behavior, unrestricted inputs, shape/gameplay/defaults, collision caches, readiness, mesh lifetimes, clothing readback, skirts, body changes, appearance saves/migration, cached correspondence, native clothing notifications, and garment classification. Main tests need local BepInEx.Core; other suites use test doubles or pure managed code. Full game-geometry captures are not distributed or required. Optional asset replay needs a separately supplied matching fixture.
 
 ## Repository layout
 
