@@ -24,7 +24,7 @@ internal static class CoverRegression
         PregnancyConfig.BodyLower.Value=0; PregnancyConfig.BodyUpper.Value=100;
         var record=new PregnancyRecord {Births=5};
         float Expected(float source)=>BodyChangeMath.Add(source,delta.Shape[key],1,0,100);
-        void Tick() => BodyChangeRuntime.ApplyAfterBelly(human,record);
+        void Tick() => TestAppearance.Apply(human,record);
         Tick();
         check("cover uses its own baseline plus pregnancy delta",Near(human.Body.Applied.Shape[key],Expected(.2f)));
         check("unaffected out-of-range cover remains unchanged",human.Body.Applied.Shape[zero]==2);

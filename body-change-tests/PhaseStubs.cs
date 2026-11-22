@@ -6,6 +6,7 @@ internal static class PhaseTrace
 }
 internal static class BellyVertexMorph
 {
+    internal static bool IsClothingRenderer(UnityEngine.SkinnedMeshRenderer renderer)=>renderer.name=="shirt" || renderer.name.StartsWith("cloth");
     internal static void UpdateVirtual(Character.Human human) { PhaseTrace.Events.Add("binding");PhaseTrace.Binding?.Invoke(human); }
     internal static void UpdateBodyCollision(Character.Human human) { PhaseTrace.Events.Add("collision"); }
 }
