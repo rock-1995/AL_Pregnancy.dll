@@ -10,7 +10,13 @@ $projects=@(
     'source-lifetime-tests/SourceLifetimeRegression.csproj',
     'clothing-runtime-tests/ClothingRuntimeRegression.csproj',
     'skirt-tests/SkirtRegression.csproj',
-    'body-change-tests/BodyChangeRegression.csproj'
+    'body-change-tests/BodyChangeRegression.csproj',
+    'appearance-tests/AppearanceTests.csproj',
+    'cache-tests/CacheTests.csproj',
+    'native-readiness-tests/Readiness.Tests.csproj',
+    'native-clothing-tests/NativeClothingTests.csproj',
+    'mesh-lease-tests/MeshLeaseTests.csproj',
+    'clothing-classification-tests/ClassificationTests.csproj'
 )
 foreach($project in $projects){
     & dotnet run --project (Join-Path $PSScriptRoot $project) -c Release "-p:GameDir=$GameDir"

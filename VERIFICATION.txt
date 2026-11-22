@@ -1,36 +1,30 @@
-AL Pregnancy 0.2.44 - release verification, 2026-11-16
+AL Pregnancy 0.3.5 - release verification, 2026-11-22
 
-Production rebuild: 0 warnings, 0 errors. Body/animation/clothing-correction regression: 944 checks passed.
-The published DLL is byte-identical to the installed 0.2.44 build from 2026-10-18; production source matches that build's archived source.
-DLL SHA-256: 953AFCB4295CEACE1DDD02B6177B6DCB323869873AC8EFEB7BD50AED494CD16B
-The original 2026-10-18 full Test.ps1 run passed. This publication reran the build and focused body-change suite. No game was launched or visual scene tested for this publication.
+The production source builds against AmanatsuLocation's current BepInEx/IL2CPP interop assemblies in Release net6.0 with 0 warnings and 0 errors. The release DLL identity is listed in SHA256SUMS.txt; game/framework dependency binaries are not distributed.
 
-Previous verification:
+The 0.3.5 character-editor layout uses the game's sliced background and standard two-line slider template, with fixed row height and spacing. Native input/reset/Undo callbacks are retained. The revised layout has not yet been rechecked in a live game screenshot; successful compilation is not a visual-layout validation.
 
-AL Pregnancy 0.2.43 - verification, 2026-10-14
+Test.ps1 completed successfully with all sixteen offline suites:
+- Breast physics ownership and axis driver: 69 checks.
+- Unrestricted input/kernel behavior: 107 checks.
+- Main shape, gameplay, defaults, migration and persistence: 587 checks.
+- Native collision cache/direct geometry model: 46 checks.
+- Native completion/readiness adapter: 67 checks.
+- Mesh lifetime: 28 checks; shared-source lifetime: 25 checks.
+- Clothing buffer/readback API model: 30 checks.
+- Skirt production kernels and virtual runtime: 11,224 assertions.
+- Body changes, animation contacts and clothing corrections: 944 checks.
+- Appearance values, v1-v4 migration and persistence: 9 scenarios.
+- Garment correspondence cache: 12 scenario groups, including identity/matrix invalidation and no repeated search on unchanged inputs.
+- Native readiness and direct mesh replacement: 20 checks.
+- Native clothing notifications: 8 checks.
+- Mesh lease routing/reuse: 13 checks.
+- Current production garment classification: 23 checks, including 20 built-in pantyhose renderer paths.
 
-Production build: 0 warnings, 0 errors. Assembly version: 0.2.43.0.
-DLL SHA-256: D6582F071A4CE80EF379720F320B99EB1F317F24652AAE83E61D5CA1B63773E7
-Main regression suite: 587 checks passed.
+The cache and classification suites extract the relevant methods from the current production source at build time. Their generated source is not committed. Classification fixtures contain names/paths only, not game geometry. Legacy suites were adapted to the current appearance API and event-driven lifecycle without changing production code or dropping coverage.
 
-Forward fullness (growthFullness) changes from 1.116265 to 1.10 in both
-VtxSettings and presets/ALPregnancy_belly.json. Checks compare all 81 fields:
-this one requested override and the other 80 accepted values. The historical
-0.2.40 fixture is retained unchanged. Explicitly saved settings retain their
-values; the current preset format remains version 5 / startDay 40.
+These are managed tests and modeled Unity/IL2CPP/Obi boundaries. They do not measure native GPU readback, the actual physics solver, full scene behavior, every pose/outfit, or game FPS. Collision Plus's sphere/capsule contact envelope differs from the previous triangle-based solver. No numerical frame-rate improvement is claimed.
 
-Runtime-source comparison against 0.2.42 confirms that the only behavioral
-change is the default value. The other source edits synchronize the assembly,
-plugin, F8 and diagnostic version labels. Animation contact, deformation,
-protection, curvature, collision and virtual skinning algorithms are unchanged.
-The two supplied template cards are also byte-identical to 0.2.42.
+The native collision bridge refreshes only existing belly input data. The production fluid mesh submission and Obi refresh paths remain intact. Character appearance persists in companion-save format v4; version 0.2.44 cannot read a v4 companion, so downgrading requires a compatible native-save/sidecar backup pair.
 
-The 0.2.42 body/animation suite previously passed 923 checks, and the user
-confirmed that release fixed the reported grabbing/supporting contact case.
-Those unchanged tests are not presented as newly rerun in 0.2.43. The new
-fullness setting has not been visually validated in every live pose or outfit.
-
-Historical local geometry replay at arc 0.35 retained extra intersections in
-an extreme thigh -60 degree pose; it is not a full-pose validation of arc 0.8.
-Optional full-mesh replay needs a separately supplied local fixture. No game
-native assemblies, full mesh captures, saves or local configuration are included.
+Use the BepInEx plugin version and DLL hash to identify the installed release. The legacy mesh-diagnostic version field is not the authoritative plugin version.
