@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <ItemGroup><Compile Include="../src/MeshLease.cs" Link="MeshLease.cs" /><Compile Include="../src/SupplementalClothing.cs" Link="SupplementalClothing.cs" /></ItemGroup>
+</Project>
