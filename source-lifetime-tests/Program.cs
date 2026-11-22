@@ -6,7 +6,7 @@ int checks=0;
 void Check(string name,bool condition){if(!condition)throw new Exception(name);Console.WriteLine("PASS: "+name);checks++;}
 (Human,SkinnedMeshRenderer,MeshLease) Lease(Mesh original)
 {
-    var h=new Human();var r=new SkinnedMeshRenderer{sharedMesh=original};h.GameObject.Renderers=new[]{r};
+    var h=new Human();var r=new SkinnedMeshRenderer{sharedMesh=original,ClothingEligible=SupplementalClothing.Matches(original.name)};h.GameObject.Renderers=new[]{r};
     var lease=new MeshLease();lease.Acquire(h);return(h,r,lease);
 }
 var original=new Mesh();var (human,renderer,lease)=Lease(original);var clone=renderer.sharedMesh;
@@ -77,7 +77,7 @@ Check("GPU failure leaves the original visible and unowned",failed.Item2.sharedM
 failed.Item3.Dispose();ReadableClothingMesh.Fail=false;
 int copies=ReadableClothingMesh.Calls;
 var outside=Lease(new Mesh {name="unknown_unreadable",isReadable=false});
-Check("GPU fallback is limited to supplemental clothing",ReadableClothingMesh.Calls==copies && outside.Item3.ReadableCount==0);
+Check("A renderer outside the garment classifier keeps its unreadable source",ReadableClothingMesh.Calls==copies && outside.Item3.ReadableCount==0);
 outside.Item3.Dispose();
 Console.WriteLine($"{checks} source lifetime checks passed (native-root model; not a Unity runtime test).");
 
@@ -116,7 +116,7 @@ namespace UnityEngine
     }
     public class SkinnedMeshRenderer : Object
     {
-        public string name="o_lower_type04"; public bool enabled=true;
+        public string name="o_lower_type04"; public bool enabled=true, ClothingEligible;
         public GameObject gameObject=new(); public Bounds localBounds;
         public Mesh sharedMesh;
     }
@@ -192,6 +192,11 @@ namespace Il2CppSystem.Collections
 }
 namespace ALPregnancy
 {
+    // Classifier output is an input to this lifetime suite. Real name/path
+    // routing is exercised by clothing-classification-tests.
+    internal static class BodyMeshSelection { internal static void Register(Character.Human human) { } }
+    internal static class BellyVertexMorph
+    { internal static bool IsClothingRenderer(SkinnedMeshRenderer renderer) => renderer.ClothingEligible; }
     internal static class PregnancyPlugin { internal static readonly Log Logger = new(); internal static readonly Flag ConfigLog=new(); }
     internal class Log { internal int Warnings; internal void LogInfo(string value) { } internal void LogWarning(string value) => Warnings++; }
 }
