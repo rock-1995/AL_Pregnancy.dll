@@ -53,6 +53,7 @@ internal sealed class MeshLease : IDisposable
 
     private readonly List<Entry> _entries = new();
     private readonly Dictionary<int, (int Mesh, bool Active)> _observed = new();
+    private readonly Dictionary<int, Observation> _refresh = new();
     public int ReadableCount => _entries.Count;
     public int UnreadableCount { get; private set; }
 
@@ -87,10 +88,44 @@ internal sealed class MeshLease : IDisposable
         return new Changes(meshChanged || count != _observed.Count, visibility);
     }
 
+    // A native clothes replacement leaves the other renderers and their owned
+    // clones intact. Morph records for detached meshes are undone by the caller
+    // before retiring these entries, just as they are before full Dispose.
+    internal void Refresh(Human human, IReadOnlyList<Observation> observations)
+    {
+        _refresh.Clear();
+        foreach (var item in observations)
+            if (item.Renderer != null && item.Mesh != null) _refresh[item.RendererId] = item;
+        int removed = 0, preserved = 0;
+        for (int i = _entries.Count - 1; i >= 0; i--)
+        {
+            var entry = _entries[i];
+            if (entry.Renderer != null &&
+                _refresh.TryGetValue(entry.Renderer.GetInstanceID(), out var item) && item.Mesh == entry.Clone)
+            { preserved++; continue; }
+            RestoreEntry(entry);
+            _entries.RemoveAt(i);
+            removed++;
+        }
+        var additions = new List<Observation>();
+        foreach (var item in _refresh.Values)
+            if (!_observed.TryGetValue(item.RendererId, out var old) || old.Mesh != item.MeshId)
+                additions.Add(item);
+        _observed.Clear();
+        foreach (var item in _refresh.Values)
+            _observed[item.RendererId] = (item.MeshId, item.Active);
+        int before = _entries.Count;
+        Acquire(human, additions);
+        UnreadableCount = _observed.Count - _entries.Count;
+        _refresh.Clear();
+        PregnancyPlugin.Logger.LogInfo($"[Clothing meshes] preserved={preserved}, added={_entries.Count - before}, retired={removed}");
+    }
+
     public void Acquire(Human human, IReadOnlyList<Observation> observations = null)
     {
         try
         {
+            BodyMeshSelection.Register(human);
             IEnumerable<SkinnedMeshRenderer> renderers = observations != null
                 ? observations.Select(o => o.Renderer) : human.GameObject.GetComponentsInChildren<SkinnedMeshRenderer>(true).ToArray();
             foreach (var renderer in renderers)
@@ -101,7 +136,7 @@ internal sealed class MeshLease : IDisposable
                 Mesh original = renderer.sharedMesh;
                 Mesh clone = null;
                 if (original.isReadable) clone = UnityEngine.Object.Instantiate(original);
-                else if (SupplementalClothing.Matches(renderer.name + "/" + original.name))
+                else if (BellyVertexMorph.IsClothingRenderer(renderer))
                 {
                     clone = ReadableClothingMesh.TryCreate(original, out var reason);
                     if (clone == null)
@@ -140,7 +175,16 @@ internal sealed class MeshLease : IDisposable
     public void Dispose()
     {
         foreach (var entry in _entries)
-        {
+            RestoreEntry(entry);
+        _entries.Clear();
+        _observed.Clear();
+        _refresh.Clear();
+        UnreadableCount = 0;
+        FluidMeshLifetime.Collect(force: true);
+    }
+
+    private static void RestoreEntry(Entry entry)
+    {
             bool retainedBaseline = false;
             try
             {
@@ -163,10 +207,5 @@ internal sealed class MeshLease : IDisposable
             }
             catch (Exception ex) { PregnancyPlugin.Logger.LogWarning("Mesh restore: " + ex.Message); }
             finally { if (!retainedBaseline) FluidMeshLifetime.Retire(entry.Clone, entry.Original); }
-        }
-        _entries.Clear();
-        _observed.Clear();
-        UnreadableCount = 0;
-        FluidMeshLifetime.Collect(force: true);
     }
 }

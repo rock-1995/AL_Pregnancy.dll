@@ -51,6 +51,14 @@ namespace ALPregnancy
             public TorsoProfile Profile;
             public VirtualRig Virtual;
             public bool VirtualPending;
+            public bool VisibilityDirty;
+            public int SurfaceRevision;
+            public BodyAnchorContext BodyAnchor;
+            public HashSet<MeshRecord> VisibleBodyRecords;
+            public long RebuildStarted;
+            public string RebuildMode;
+            public int RecomputedClothes, ReusedClothes;
+            public bool RebuiltBodySurface;
             public CollisionRig Collision;
             public bool       FrameValid;
             public float      LastAppliedRate  = float.NaN;
@@ -83,9 +91,6 @@ namespace ALPregnancy
             public SkinnedMeshRenderer SMR;
             public HashSet<int> BellyBoneIdxSet;
             public HashSet<int> LegBoneIdxSet;
-            // Cached per-overlay-vert mapping: overlayVert[i] → nearest body vert index.
-            // Built once on first use; null until then.
-            public int[] NearestBodyVertIdx;
             public Matrix4x4 ToBody;
             public Matrix4x4 FromBody;
         }
@@ -110,6 +115,7 @@ namespace ALPregnancy
             public Mesh      Mesh;
             public VirtualBinding Virtual;
             public Vector3[] OrigVerts;        // bind-pose baseline
+            public NearestBodyVertexMap OverlayBodyMap;
             public Vector3[] LastNewV;
             public float[] BellyInfluence;
             public float[] ProtectionKeep; // remaining shape and virtual-axis ownership after local guards
@@ -123,6 +129,8 @@ namespace ALPregnancy
             public Vector4[] OrigTangents;      // tangents at first record creation (before any deformation)
             public System.Numerics.Matrix4x4 ToReference = System.Numerics.Matrix4x4.Identity;
             public int       AppliedSig;
+            public int ClothingSurfaceRevision = -1;
+            public float[] VirtualAlpha;
             public int       LastDeformedCount = -1;  // vertex count from last ApplySMR — used to suppress repeated log lines
         }
 
@@ -305,7 +313,14 @@ namespace ALPregnancy
 
             // ── Cheap re-apply (rate unchanged) ───────────────────────────
             if (RateClose(rate, st.LastAppliedRate))
+            {
+                if (st.VisibilityDirty) ApplyVisibility(human, stateKey, st, rate);
                 return;
+            }
+
+            BeginRebuild(st, "shape");
+            st.VisibilityDirty = false;
+            st.SurfaceRevision++;
 
             // Cached states can alternate between actors without calling Find again.
             BodyMeshSelection.Register(human);
@@ -348,15 +363,11 @@ namespace ALPregnancy
             ApplySharedBodyProtection(_records[stateKey], st.Frame, rate);
             ApplySkinShading(_records[stateKey],st.Frame);
 
-            BodyAnchorContext bodyAnchor = CreateBodyAnchorContext(st.Frame);
-            foreach (var bodyRec in _records[stateKey])
-                if (bodyRec.Renderer != null && BodyMeshSelection.IsBodyPiece(bodyRec.Renderer) &&
-                    bodyRec.Renderer.enabled && bodyRec.Renderer.gameObject.activeInHierarchy && bodyRec.LastNewV != null &&
-                    !(bodyRec.Mesh.name ?? "").Contains("shadow", StringComparison.OrdinalIgnoreCase))
-                    AddBodyAnchorMesh(bodyAnchor, bodyRec.Renderer, bodyRec, bodyRec.BellyMask, bodyRec.LastNewV, st.Frame);
-            FinalizeBodyAnchorContext(bodyAnchor);
+            st.VisibleBodyRecords = ActiveBodyRecords(_records[stateKey]);
+            st.RebuiltBodySurface = true;
+            st.BodyAnchor = BuildBodyAnchor(_records[stateKey], st.Frame);
 
-            ApplyClothSMRs(human, charaId, _records[stateKey], st, rate, bodyAnchor);
+            ApplyClothSMRs(human, charaId, _records[stateKey], st, rate, st.BodyAnchor);
             // Bind only after the native body customization has been committed.
             // UpdateVirtual consumes this once at the same native completion.
             st.LastAppliedRate = rate;
@@ -428,6 +439,12 @@ namespace ALPregnancy
                     st.BodyLayerEntries = null;
                     st.LastBodyLayerApplied = -1;
                 }
+        }
+
+        public static void InvalidateVisibility(int charaId)
+        {
+            foreach (var key in KeysForChara(charaId))
+                if (_state.TryGetValue(key, out var st)) st.VisibilityDirty = true;
         }
 
         public static string GetStatusLine(int charaId)
@@ -1069,7 +1086,7 @@ namespace ALPregnancy
             // Step 2: Map to smr.bones[] + populate weight-filter sets
             try
             {
-                var smrBones = smr.bones;
+                Transform[] smrBones = NativeBinding(smr)?.Bones ?? (Transform[])smr.bones;
                 int bc = smrBones?.Length ?? 0;
 
                 if (bc > 0)
@@ -1290,24 +1307,20 @@ namespace ALPregnancy
                         var overlayRec = FindRecord(recs, smr.sharedMesh);
                         if (overlayRec?.OrigVerts != null)
                         {
-                            // Build (and cache) nearest-body-vert index for each overlay vert.
-                            if (entry.NearestBodyVertIdx == null)
-                            {
-                                var bodySpaceVerts = new Vector3[overlayRec.OrigVerts.Length];
-                                for (int i = 0; i < bodySpaceVerts.Length; i++)
-                                    bodySpaceVerts[i] = entry.ToBody.MultiplyPoint3x4(overlayRec.OrigVerts[i]);
-                                entry.NearestBodyVertIdx = BuildNearestBodyVertCache(bodySpaceVerts, bodyRec.OrigVerts);
-                            }
+                            // Entries are rebuilt after visibility changes; the rest-vertex
+                            // correspondence belongs to the longer-lived mesh record.
+                            var nearestBodyVertIdx = (overlayRec.OverlayBodyMap ??= new NearestBodyVertexMap())
+                                .Get(overlayRec.OrigVerts, bodyRec.OrigVerts, entry.ToBody);
 
                             // Accumulate a narrow NippleGuard on the body record from every
                             // mnpa/mnpb overlay that is processed.  Multiple overlays (left/right
                             // areola, left/right nipple tip) all contribute, so we merge rather
                             // than overwrite.  Built once per body mesh record; cleared together
                             // with the record when the SMR changes.
-                            if (entry.NearestBodyVertIdx != null)
+                            if (nearestBodyVertIdx != null)
                                 bodyRec.NippleGuard = MergeNippleGuard(
                                     bodyRec.Mesh, bodyRec.OrigVerts.Length,
-                                    entry.NearestBodyVertIdx, bodyRec.NippleGuard);
+                                    nearestBodyVertIdx, bodyRec.NippleGuard);
 
                             int on = overlayRec.OrigVerts.Length;
                             var newV = new Vector3[on];
@@ -1315,8 +1328,8 @@ namespace ALPregnancy
                             {
                                 if (BreastExclusion.Contains(overlayRec.BreastExcluded, i))
                                 { newV[i] = overlayRec.OrigVerts[i]; continue; }
-                                int bj = (entry.NearestBodyVertIdx != null && i < entry.NearestBodyVertIdx.Length)
-                                         ? entry.NearestBodyVertIdx[i] : -1;
+                                int bj = (nearestBodyVertIdx != null && i < nearestBodyVertIdx.Length)
+                                         ? nearestBodyVertIdx[i] : -1;
                                 Vector3 delta = (bj >= 0)
                                     ? bodyRec.LastNewV[bj] - bodyRec.OrigVerts[bj]
                                     : Vector3.zero;
@@ -1370,7 +1383,7 @@ namespace ALPregnancy
                     if (all == null) return;
 
                     int bodyBpCount = 0;
-                    try { bodyBpCount = st.SMR?.sharedMesh?.bindposes?.Length ?? 0; } catch { }
+                    try { bodyBpCount = NativeBinding(st.SMR)?.Binds.Length ?? st.SMR?.sharedMesh?.bindposeCount ?? 0; } catch { }
 
                     int seen = 0, skipped = 0;
                     var pending = new List<ClothEntry>();
@@ -1398,7 +1411,7 @@ namespace ALPregnancy
                         // rotated coordinate system. Compute a correction rotation matrix so
                         // ApplySMR can convert cloth mesh space ↔ body mesh space correctly.
                         int clothBpCount = 0;
-                        try { clothBpCount = smr.sharedMesh?.bindposes?.Length ?? 0; } catch { }
+                        try { clothBpCount = NativeBinding(smr)?.Binds.Length ?? smr.sharedMesh?.bindposeCount ?? 0; } catch { }
                         bool bpThreshold = bodyBpCount > 0 && clothBpCount >= bodyBpCount - 2;
                         RuntimeLogInfo($"[VtxMorph] ClothCache id={charaId}: smr=\"{smr.name}\" clothBp={clothBpCount} bodyBp={bodyBpCount} bpThreshold={bpThreshold}");
                         if (TryComputeClothBodyMatrix(smr, st.SMR, out var c2b, out var b2c, smr.name, allowAliases: true))
@@ -1451,11 +1464,20 @@ namespace ALPregnancy
                 {
                     var smr = entry?.SMR;
                     if (smr == null || smr.sharedMesh == null || !smr.sharedMesh.isReadable) continue;
-                    // Hidden variants still act as coordinate donors above. The lease
-                    // resets when visibility changes, so only visible garments need writes.
+                    // Mapping includes hidden variants. A visibility-only change
+                    // retains the lease and every already computed garment.
                     if (!smr.enabled || !smr.gameObject.activeInHierarchy) continue;
+                    var record = FindRecord(recs, smr.sharedMesh);
+                    if (record?.ClothingSurfaceRevision == st.SurfaceRevision)
+                    { st.ReusedClothes++; applied++; continue; }
+                    // The native weights/binds must be visible while rebuilding
+                    // this garment's protection and static shape.
+                    if (record?.Virtual != null) { record.Virtual.Restore(); record.Virtual = null; }
                     ApplySMR(human, recs, smr, st.Frame, rate, entry.BellyBoneIdxSet, entry.LegBoneIdxSet, true, ClothMultiplier(entry.Kind), bodyAnchor,
                              entry.HasMeshConversion, entry.ClothToBody, entry.BodyToCloth);
+                    record = FindRecord(recs, smr.sharedMesh);
+                    if (record != null) record.ClothingSurfaceRevision = st.SurfaceRevision;
+                    st.RecomputedClothes++;
                     applied++;
                 }
 
@@ -1476,7 +1498,7 @@ namespace ALPregnancy
             }
         }
 
-        private static bool IsBodyMorphClothSMR(SkinnedMeshRenderer smr, SkinnedMeshRenderer bodySMR)
+        private static bool IsBodyMorphClothSMR(SkinnedMeshRenderer smr, SkinnedMeshRenderer bodySMR, bool requireReadable = true)
         {
             try
             {
@@ -1484,7 +1506,7 @@ namespace ALPregnancy
                 if (BodyMeshSelection.IsBodyPiece(smr)) return false;
                 if (bodySMR != null && smr == bodySMR) return false;
                 if (bodySMR?.sharedMesh != null && smr.sharedMesh == bodySMR.sharedMesh) return false;
-                if (!smr.sharedMesh.isReadable || smr.sharedMesh.vertexCount <= 0) return false;
+                if ((requireReadable && !smr.sharedMesh.isReadable) || smr.sharedMesh.vertexCount <= 0) return false;
                 if (IsFaceMesh(smr)) return false;
                 if (IsAccessoryAnchorPath(smr.transform)) return false;
 
@@ -1652,6 +1674,7 @@ namespace ALPregnancy
                     rec.OrigVerts = (Vector3[])cur.Clone();
                 }
                 rec.ToReference = hasMeshConversion ? MatrixBridge.ToManaged(clothToBodyMatrix) : System.Numerics.Matrix4x4.Identity;
+                rec.VirtualAlpha = null;
 
                 var p = BellyDeformSettings.Vtx;
                 rec.BreastExcluded = BreastExclusion.BuildFullyProtected(rec.BreastWeights, rec.OrigVerts.Length, rec.NormalWeldGroup, p.BreastExclusionEnabled, p.BreastGuardStrength);
@@ -3505,10 +3528,15 @@ namespace ALPregnancy
             clothToBody = bodyToCloth = Matrix4x4.identity;
             try
             {
-                Transform[] sourceBones = clothSmr.bones;
-                Transform[] targetBones = bodySmr.bones;
-                Matrix4x4[] sourcePoses = clothSmr.sharedMesh.bindposes;
-                Matrix4x4[] targetPoses = bodySmr.sharedMesh.bindposes;
+                // A new garment can be mapped while unchanged garments/body
+                // retain virtual palettes. Mapping always consumes saved native
+                // bind data, never those appended animated palette entries.
+                var sourceBinding = NativeBinding(clothSmr);
+                var targetBinding = NativeBinding(bodySmr);
+                Transform[] sourceBones = sourceBinding?.Bones ?? (Transform[])clothSmr.bones;
+                Transform[] targetBones = targetBinding?.Bones ?? (Transform[])bodySmr.bones;
+                Matrix4x4[] sourcePoses = sourceBinding?.Binds ?? (Matrix4x4[])clothSmr.sharedMesh.bindposes;
+                Matrix4x4[] targetPoses = targetBinding?.Binds ?? (Matrix4x4[])bodySmr.sharedMesh.bindposes;
                 if (sourceBones == null || targetBones == null || sourcePoses == null || targetPoses == null ||
                     sourceBones.Length != sourcePoses.Length || targetBones.Length != targetPoses.Length) return false;
                 var sourceNames = new string[sourceBones.Length];

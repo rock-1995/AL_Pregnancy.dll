@@ -9,7 +9,7 @@ using UnityEngine;
 namespace ALPregnancy;
 
 // Preserve the legacy ID so existing configuration and plugin references remain valid.
-[BepInPlugin("local.al.pregnancy.preview", "AL Pregnancy", "0.2.44")]
+[BepInPlugin("local.al.pregnancy.preview", "AL Pregnancy", "0.3.5")]
 [BepInDependency(PatchCompatibility.UncensorGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInProcess("AmanatsuLocation.exe")]
 public sealed class PregnancyPlugin : BasePlugin
@@ -44,6 +44,9 @@ public sealed class PregnancyPlugin : BasePlugin
         BellyDeformSettings.Load();
         _controller = AddComponent<PregnancyController>();
         _harmony = new Harmony("local.al.pregnancy.preview");
+        PregnancyAppearance.Install(_harmony);
+        PregnancyMaker.Install(_harmony);
+        BodyChangeRuntime.InstallDirtyTracking(_harmony);
         // Release cloned meshes before the game tears down its character object.
         _harmony.Patch(AccessTools.Method(typeof(Human), nameof(Human.Dispose)),
             prefix: new HarmonyMethod(typeof(PregnancyPlugin), nameof(BeforeHumanDispose)));
@@ -55,7 +58,7 @@ public sealed class PregnancyPlugin : BasePlugin
         BodyChangeAnimation.Install(_harmony);
         MorphReadiness.Install(_harmony);
         BellyVertexMorph.InstallCollisionSync(_harmony);
-        Log.LogInfo("AL Pregnancy 0.2.44 loaded. Native IK and eight animator parameter readers use the visual body; live body changes refresh motion parameters.");
+        Log.LogInfo("AL Pregnancy 0.3.5 loaded. Native breast collision input bridge available; unreadable garment panels use private readable copies; maker appearance values use external save v4.");
     }
 
     internal static void TickStartupConfig() => _startupConfig?.Tick(Time.unscaledTime);
@@ -86,6 +89,7 @@ public sealed class PregnancyPlugin : BasePlugin
         _startupConfig?.Dispose();
         _startupConfig = null;
         PregnancyConfig.Changed -= PregnancyRuntime.OnSettingsChanged;
+        PregnancyMaker.Shutdown();
         PregnancyRuntime.Shutdown();
         if (_controller != null)
         {
@@ -94,6 +98,7 @@ public sealed class PregnancyPlugin : BasePlugin
         }
         BellyVertexMorph.FinishCollisionSync();
         _harmony?.UnpatchSelf();
+        PregnancyAppearance.Clear();
         return true;
     }
 }
