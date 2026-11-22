@@ -14,8 +14,8 @@ internal static class AnimationContactRegression
         var firstArray=savedFirst.shapeValueBody;
         var pregnant=new PregnancyRecord{Pregnant=true,PregnancyProgress=.7};
         var postpartum=new PregnancyRecord{Births=3};
-        BodyChangeRuntime.ApplyAfterBelly(first,pregnant);
-        BodyChangeRuntime.ApplyAfterBelly(second,postpartum);
+        TestAppearance.Apply(first,pregnant);
+        TestAppearance.Apply(second,postpartum);
         float target=first.Body.Applied.Shape[3],targetSecond=second.Body.Applied.Shape[3];
         // Native correction interpolates authored min/medium/max contact offsets.
         float Contact(float shape)=>shape<.5f ? -.08f+shape*2*.08f : (shape-.5f)*2*.13f;
@@ -46,7 +46,8 @@ internal static class AnimationContactRegression
         check("IK reads do not run shape updates or physics setters",updates==first.Body.ShapeUpdates+second.Body.ShapeUpdates&&values==first.Body.ValueUpdates+second.Body.ValueUpdates&&extras==first.Body.ExtraCalls+second.Body.ExtraCalls);
         check("animation leaves no pending body rebuild",!first.Body._isUpdateShapeBody&&!first.Body._isUpdateShapeBodyValue);
 
-        var own=BodyChangeRuntime.BeginAfterBelly(first,pregnant);
+        BodyChangeRuntime.NativeShapeUpdated(first.Body);
+        var own=TestAppearance.Begin(first,pregnant);
         BodyChangeAnimation.BeforeSingle(first.Body,out var duringCommit);
         BodyChangeAnimation.AfterRead(null,duringCommit);
         check("IK called inside visual commit preserves the outer body scope",actor.Breast==target);

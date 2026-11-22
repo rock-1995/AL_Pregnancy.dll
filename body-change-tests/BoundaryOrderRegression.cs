@@ -35,12 +35,12 @@ internal static class BoundaryOrderRegression
         check("first order is belly, preview, shape, binding, collision",PhaseTrace.Events.SequenceEqual(new[]{"belly","preview","shape","binding","collision"}));
         check("first application commits native shape only once",h.Body.ValueUpdates==1&&h.Body.ShapeUpdates==1);
         int released=PregnancyRuntime.Releases;
-        Complete(()=>renderer.bones[0]=new Transform());
+        Complete(()=>{renderer.bones[0]=new Transform();NativeClothingChanges.MarkTopology(h);});
         check("changed skeleton releases meshes without resetting body",PregnancyRuntime.Releases==released+1&&h.Body.ShapeUpdates==1);
         Complete(()=>renderer.sharedMesh=new Mesh());
         check("changed mesh releases old meshes once",PregnancyRuntime.Releases==released+2);
-        Complete(()=>h.GameObject.Renderers=h.GameObject.Renderers.Concat(new[]{new SkinnedMeshRenderer{name="shirt"}}).ToArray());
-        check("new clothing releases old meshes once",PregnancyRuntime.Releases==released+3);
+        Complete(()=>{h.GameObject.Renderers=h.GameObject.Renderers.Concat(new[]{new SkinnedMeshRenderer{name="shirt"}}).ToArray();NativeClothingChanges.MarkTopology(h);});
+        check("new clothing retains the unchanged body binding",PregnancyRuntime.Releases==released+2);
         Complete(()=>renderer.sharedMesh=null,false);Complete(()=>renderer.sharedMesh=new Mesh());
         int stableReleases=PregnancyRuntime.Releases;
         for(int i=0;i<100;i++)Complete();
