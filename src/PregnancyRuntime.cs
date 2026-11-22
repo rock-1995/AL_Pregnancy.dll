@@ -13,6 +13,7 @@ internal static class PregnancyRuntime
     private static readonly System.Random Random = new();
     private static readonly DayBoundary Calendar = new();
     private static readonly Dictionary<IntPtr, Visual> Visuals = new();
+    private static readonly Dictionary<IntPtr, (Human Human, HumanDataCustom Custom, AppearanceValues Values)> AppearanceBindings = new();
     private static readonly List<PendingWrite> Writes = new();
     private static readonly object WriteLock = new();
     private static readonly HashSet<IntPtr> NewWorlds = new();
@@ -25,6 +26,8 @@ internal static class PregnancyRuntime
     private static float _nextPoll, _nextScan;
     private static bool _blocked, _hooksReady;
     private static bool _settingsChanged;
+    private static PregnancyGrowthSchedule.Timing _appearanceTiming;
+    private static int _appearanceBirths;
     private static string FemaleDirectory => Path.Combine(Paths.GameRootPath, "UserData", "chara", "female");
     internal static PregnancyWorld World { get; private set; }
     internal static string Status { get; private set; } = "Waiting for a game save";
@@ -65,6 +68,7 @@ internal static class PregnancyRuntime
             Hook(typeof(Game), "set_SaveData", after: nameof(AfterSetSaveData));
             Hook(typeof(Cycle), nameof(Cycle.IncrementTimeZone), nameof(BeforeTime), nameof(AfterTime));
             Hook(typeof(Counter), nameof(Counter.Add), after: nameof(AfterCounter));
+            RememberAppearanceSettings();
             _hooksReady = true;
             Log("Gameplay hooks ready: save/load, calendar, event counter. Three conception modes.");
         }
@@ -89,16 +93,42 @@ internal static class PregnancyRuntime
         _settingsChanged = true;
         _nextPoll = 0;
     }
+    private static void RememberAppearanceSettings()
+    {
+        _appearanceTiming = PregnancyGrowthSchedule.Resolve(PregnancyConfig.Rules);
+        _appearanceBirths = PregnancyConfig.BodyBirths.Value;
+    }
+    private static void ApplyAppearanceSettings()
+    {
+        var rules = PregnancyConfig.Rules;
+        var timing = PregnancyGrowthSchedule.Resolve(rules);
+        int births = PregnancyConfig.BodyBirths.Value;
+        bool bellyChanged = timing != _appearanceTiming, bodyChanged = births != _appearanceBirths;
+        _appearanceTiming = timing;
+        _appearanceBirths = births;
+        if (World == null || (!bellyChanged && !bodyChanged)) return;
+        foreach (var record in World.Characters.Values)
+        {
+            record.Appearance ??= new AppearanceValues();
+            if (bellyChanged) record.Appearance.SetBelly(record.Growth(rules));
+            if (bodyChanged) record.Appearance.SetBody((float)BodyChangeMath.Progress(
+                record.IsPregnant, record.PregnancyProgress, record.Births, births));
+        }
+    }
     internal static bool ApplyDebug(PregnancyWorld expected, string key, PregnancyDebugCommand command, double value = 0)
     {
         try
         {
             var data = Current();
             if (!Active || !Same(data) || !data.Ready) return false;
+            if (!World.Characters.TryGetValue(key ?? "", out var previous)) return false;
+            var appearanceBefore = (previous.Pregnant, previous.PregnancyProgress, previous.Births);
             if (!PregnancyDebugActions.Apply(World, expected, key, command, value, PregnancyConfig.Rules)) return false;
             if (PregnancyController.ManualPreviewActive) PregnancyController.StopForWorldChange();
             _nextPoll = 0; // Apply the new rate / release meshes in the next normal update.
             var p = World.Characters[key];
+            PublishChangedAppearance(p, appearanceBefore);
+            BindAppearances(data);
             Report($"Debug {command}: {p.Name}, pregnant={p.IsPregnant}, progress={p.PregnancyProgress:F6}, recovery={p.RecoveryProgress:F6}. Memory only; save in game to keep.");
             return true;
         }
@@ -118,24 +148,28 @@ internal static class PregnancyRuntime
             {
                 _settingsChanged = false;
                 Log("F1 settings applied live: " + PregnancyConfig.LastChange + "; existing progress retained.");
+                ApplyAppearanceSettings();
             }
             FinishWrites();
             var data = Current();
             if (data == null || !data.Ready)
             {
                 // A transient save/loading flag is not a character mesh teardown.
-                // Save replacement and Human.Dispose already release their owners.
+                // A different/uninitialized save, however, must lose old bindings.
+                if (!Same(data)) SuspendWorld();
                 return;
             }
             if (data.Pointer != _savePointer) Activate(data);
             if (!Active) return;
             PatchCompatibility.Refresh();
             ObserveTime(data);
+            BindAppearances(data);
             if (Time.unscaledTime >= _nextScan)
             {
                 _nextScan = Time.unscaledTime + 10;
                 ScanCards();
                 RegisterRoster(data);
+                PregnancyAppearance.Collect();
             }
 
         }
@@ -161,6 +195,7 @@ internal static class PregnancyRuntime
         FinishWrites(true);
         PregnancyController.StopForWorldChange();
         ReleaseVisuals();
+        ClearAppearanceBindings();
         _savePointer = data.Pointer;
         _blocked = false;
         Events.Clear();
@@ -176,12 +211,14 @@ internal static class PregnancyRuntime
             _slot = fresh ? null : NativePath(string.IsNullOrWhiteSpace(data.FileName) ? _loadRequest : data.FileName);
             _loadRequest = null;
             World = !fresh && _slot != null && File.Exists(_slot)
-                ? PregnancyStorage.Load(_slot, data.SaveTimeText, out var loadedStatus, PregnancyConfig.Rules, BellyDeformSettings.StartDay)
+                ? PregnancyStorage.Load(_slot, data.SaveTimeText, out var loadedStatus, PregnancyConfig.Rules, BellyDeformSettings.StartDay, PregnancyConfig.BodyBirths.Value)
                 : new PregnancyWorld();
             Status = _slot == null ? "New game (not yet saved)" : "Active slot: " + Path.GetFileName(_slot);
+            RememberAppearanceSettings();
             Calendar.Reset(data.Cycle?.TimeZone ?? -1);
             ScanCards();
             RegisterRoster(data);
+            BindAppearances(data);
             _nextScan = Time.unscaledTime + 10;
             Log(Status + $"; day={World.ElapsedDays}, records={World.Characters.Count}, cards={World.CardCycleProgress.Count}");
         }
@@ -222,7 +259,12 @@ internal static class PregnancyRuntime
         if (data == null || data.HumanData?.Parameter?.sex != 1) return null;
         string card = CardKey(data.CharaFileName);
         int day = World.EnsureCardCycle(card, Random);
-        return World.Register(ActorKey(data), ActorName(data), day);
+        string key = ActorKey(data);
+        bool existed = World.Characters.ContainsKey(key);
+        var record = World.Register(key, ActorName(data), day);
+        if (!existed) PublishAppearance(record);
+        PregnancyAppearance.Bind(data.HumanData.Custom, record.Appearance);
+        return record;
     }
     private static void RegisterRoster(SaveData data)
     {
@@ -237,7 +279,10 @@ internal static class PregnancyRuntime
         {
             ScanCards();
             RegisterRoster(data);
+            var appearanceBefore = World.Characters.Values.Select(p => (Record: p, Before: (p.Pregnant, p.PregnancyProgress, p.Births))).ToArray();
             PregnancySimulation.NextDay(World, PregnancyConfig.Rules, Random, Report);
+            foreach (var entry in appearanceBefore) PublishChangedAppearance(entry.Record, entry.Before);
+            BindAppearances(data);
             Log($"New day {World.ElapsedDays}: cycles +1; pregnant={World.Characters.Values.Count(x => x.IsPregnant)}.");
         }
     }
@@ -291,6 +336,7 @@ internal static class PregnancyRuntime
             Log($"Conception check: {p.Name}, mode={rules.Mode}, cycle={p.CycleDay}, base={chance.BaseChance:P2}, residual={chance.ResidualFactor:F3}, egg={chance.EggFactor:F2}, effectiveBeforeEvent={chance.EffectiveChance:P2}, reason={chance.Reason}, eligible={p.CanConceive(rules)}, history={eventKey}.");
             bool conceived = PregnancySimulation.Exposure(p, rules,
                 father.Actor?.BaseData == null ? father.Data?.About?.dataID ?? father.Name : ActorKey(father.Actor.BaseData), father.Name, Random);
+            if (conceived) { PublishAppearance(p); BindAppearances(data); }
             Report(p.Name + (conceived ? ": conceived; father " + p.FatherName : p.CanConceive(rules) && rules.Mode == ConceptionMode.ComplexCycle ? ": residual set to 1; daily check pending" : ": conception event checked (no new pregnancy)"));
         }
         catch (Exception ex) { PregnancyPlugin.Logger.LogError("[Pregnancy] Event: " + ex); }
@@ -302,13 +348,18 @@ internal static class PregnancyRuntime
     }
     private static void AfterSetSaveData(Game __instance)
     {
-        try { var data = __instance.SaveData; if (data != null && data.Ready && (!Same(data) || _loadRequest != null)) Activate(data); }
+        try
+        {
+            var data = __instance.SaveData;
+            if (data != null && data.Ready && (!Same(data) || _loadRequest != null)) Activate(data);
+            else if (!Same(data) || _loadRequest != null) SuspendWorld();
+        }
         catch (Exception ex) { Log("Set save: " + ex.Message); }
     }
     private static void AfterInitialize(SaveData __instance)
     {
         lock (WriteLock) NewWorlds.Add(__instance.Pointer);
-        if (Same(__instance)) { _loadRequest = null; _savePointer = IntPtr.Zero; ReleaseVisuals(); }
+        if (Same(__instance)) { _loadRequest = null; SuspendWorld(); }
     }
     private static void AfterCopy(SaveData __instance, SaveData source)
     {
@@ -436,9 +487,113 @@ internal static class PregnancyRuntime
             }
         }
     }
+    private static void PublishAppearance(PregnancyRecord record)
+    {
+        record.Appearance ??= new AppearanceValues();
+        record.Appearance.SetBelly(record.Growth(PregnancyConfig.Rules));
+        record.Appearance.SetBody((float)BodyChangeMath.Progress(record.IsPregnant, record.PregnancyProgress, record.Births, PregnancyConfig.BodyBirths.Value));
+    }
+
+    private static void PublishChangedAppearance(PregnancyRecord record, (bool Pregnant, double Progress, int Births) before)
+    {
+        record.Appearance ??= new AppearanceValues();
+        bool pregnancyChanged = before.Pregnant != record.Pregnant || before.Progress != record.PregnancyProgress;
+        if (pregnancyChanged) record.Appearance.SetBelly(record.Growth(PregnancyConfig.Rules));
+        if (pregnancyChanged || before.Births != record.Births)
+            record.Appearance.SetBody((float)BodyChangeMath.Progress(record.IsPregnant, record.PregnancyProgress, record.Births, PregnancyConfig.BodyBirths.Value));
+    }
+
+    // The world is the persistent owner. Only the current save's NPC data and
+    // its instantiated Humans borrow these values; no PNG is opened or written.
+    private static void BindAppearances(SaveData data)
+    {
+        if (!Active || !Same(data)) return;
+        var npcs = data.NPCDataList;
+        if (npcs != null) foreach (var npc in npcs)
+            if (npc?.HumanData?.Custom != null && World.Characters.TryGetValue(ActorKey(npc), out var record))
+                PregnancyAppearance.Bind(npc.HumanData.Custom, record.Appearance);
+        var game = Game.Instance;
+        if (game?.Heroines != null) for (int i = 0; i < game._heroines.Count; i++)
+        {
+            var heroine = game.Heroines[i];
+            if (heroine?.BaseData != null && World.Characters.TryGetValue(ActorKey(heroine.BaseData), out var record))
+                BindHuman(heroine.Human, record);
+        }
+        var scene = HScene.Instance;
+        if (scene?.Actors != null) foreach (var actor in scene.Actors)
+            if (actor?.NPCData != null && World.Characters.TryGetValue(ActorKey(actor.NPCData), out var record))
+                BindHuman(actor.Human, record);
+    }
+
+    private static void BindHuman(Human human, PregnancyRecord record)
+    {
+        var custom = human?.Data?.Custom;
+        if (custom == null || record?.Appearance == null) return;
+        if (PregnancyMaker.IsEditing(human)) return;
+        PregnancyAppearance.Bind(custom, record.Appearance);
+        AppearanceBindings[human.Pointer] = (human, custom, record.Appearance);
+    }
+
+    private static void ClearAppearanceBindings()
+    {
+        foreach (var binding in AppearanceBindings.Values)
+            if (binding.Human != null && !binding.Human.Disposed && !PregnancyMaker.IsEditing(binding.Human))
+                PregnancyAppearance.Bind(binding.Custom, new AppearanceValues());
+        AppearanceBindings.Clear();
+    }
+
+    private static void SuspendWorld()
+    {
+        if (_savePointer == IntPtr.Zero && World == null && AppearanceBindings.Count == 0) return;
+        ReleaseVisuals();
+        ClearAppearanceBindings();
+        _savePointer = IntPtr.Zero;
+        World = null;
+        Events.Clear();
+        _counterPointer = IntPtr.Zero;
+        Status = "Waiting for a game save";
+    }
+
+    internal static void OnAppearanceEdited(Human human, AppearanceValues values)
+    {
+        if (PregnancyController.ManualPreviewActive) PregnancyController.StopForWorldChange();
+        // The editor works on a copy. Only its confirmed EditHumanData copy-back
+        // commits values; cancelling the maker must leave the save unchanged.
+        if (PregnancyMaker.IsEditing(human)) return;
+        var record = FindVisualRecord(human);
+        if (record == null) return; // Standalone maker edits remain a local preview.
+        record.Appearance ??= new AppearanceValues();
+        record.Appearance.SetBelly(values.Belly);
+        record.Appearance.SetBody(values.Body);
+    }
+
+    internal static void InitializeMakerAppearance(Human human)
+    {
+        var record = FindVisualRecord(human);
+        if (human?.Data?.Custom != null && record?.Appearance != null)
+            PregnancyAppearance.Bind(human.Data.Custom, record.Appearance.Clone());
+    }
+
+    internal static void CommitMakerAppearance(HumanData destination, AppearanceValues values)
+    {
+        var data = Current();
+        if (!Active || !Same(data) || destination == null || values == null || data.NPCDataList == null) return;
+        foreach (var npc in data.NPCDataList)
+            if (npc?.HumanData?.Pointer == destination.Pointer)
+            {
+                var record = Register(npc);
+                if (record == null) return;
+                record.Appearance.SetBelly(values.Belly);
+                record.Appearance.SetBody(values.Body);
+                BindAppearances(data);
+                Log("Maker appearance applied to save character: " + record.Name + "; save in game to keep.");
+                return;
+            }
+    }
+
     internal static PregnancyRecord FindVisualRecord(Human human)
     {
-        if (human == null || !PregnancyPlugin.Enabled.Value || PregnancyController.ManualPreviewActive || !human.HiPoly || human.Sex != 1) return null;
+        if (human == null || human.Sex != 1) return null;
         var data = Current();
         if (data == null || !data.Ready) return null;
         if (!Same(data)) Activate(data);
@@ -457,6 +612,13 @@ internal static class PregnancyRuntime
             foreach (var actor in scene.Actors)
                 if (actor?.NPCData != null && actor.Human?.Pointer == human.Pointer)
                 { World.Characters.TryGetValue(ActorKey(actor.NPCData), out record); break; }
+        // An in-game editor may use a different Human. Its explicit received
+        // data identifies the NPC; names, card filenames and lookalikes do not.
+        var source = record == null ? PregnancyMaker.SourceData(human) : null;
+        if (source != null && data.NPCDataList != null)
+            foreach (var npc in data.NPCDataList)
+                if (npc?.HumanData?.Pointer == source.Pointer)
+                { record = Register(npc); break; }
         return record;
     }
     internal static void UpdateHumanVisual(Human human)
@@ -464,24 +626,57 @@ internal static class PregnancyRuntime
         if (human == null) return;
         if (!PregnancyPlugin.Enabled.Value || PregnancyController.ManualPreviewActive || !human.HiPoly || human.Sex != 1)
         { Release(human.Pointer); return; }
-        var record = FindVisualRecord(human);
-        if (record == null) return; // The native actor owner may still be assigning this Human.
-        float growth = record.Growth(PregnancyConfig.Rules);
+        var custom = human.Data?.Custom;
+        if (custom == null) return;
+        if (!PregnancyMaker.IsEditing(human))
+        {
+            var data = Current();
+            if (!Same(data))
+            {
+                if (data != null && data.Ready) Activate(data);
+                else SuspendWorld();
+            }
+            if (!Active || !Same(data))
+            {
+                // NativeVisualUpdate also reads Body after this call. Detach
+                // the local values instead of mutating the previous world's
+                // record, so that path cannot reapply an old save's shape.
+                var previous = PregnancyAppearance.Get(custom);
+                if (previous.Belly != 0 || previous.Body != 0)
+                    PregnancyAppearance.Bind(custom, new AppearanceValues());
+                Release(human.Pointer);
+                return;
+            }
+            var values = PregnancyAppearance.Get(custom);
+            if (!AppearanceBindings.TryGetValue(human.Pointer, out var bound) ||
+                bound.Custom.Pointer != custom.Pointer || !ReferenceEquals(bound.Values, values))
+            {
+                var record = FindVisualRecord(human);
+                if (record != null) BindHuman(human, record);
+            }
+        }
+        float growth = PregnancyAppearance.Get(custom).Belly;
         if (growth <= 0) { Release(human.Pointer); return; }
         if (!MorphReadiness.TryBeginApply(human)) return;
         Visuals.TryGetValue(human.Pointer, out var visual);
         var meshes = MorphReadiness.CurrentMeshes(human);
-        var changes = visual?.Lease.CheckChanges(meshes) ?? default;
+        var changes = MorphReadiness.ChangedAtBoundary(human) ? visual?.Lease.CheckChanges(meshes) ?? default : default;
         if (visual != null && changes.Mesh)
-        { Release(human.Pointer); visual = null; }
+        {
+            BellyVertexMorph.BeforeClothingMeshesChanged(visual.Id);
+            visual.Lease.Refresh(human, meshes);
+            MorphReadiness.RememberLeasedMeshes(human);
+            BellyVertexMorph.InvalidateClothingMeshes(visual.Id);
+        }
         if (visual == null)
         {
             visual = new Visual { Human = human, Id = human.GameObject.GetInstanceID(), Lease = new MeshLease() };
             visual.Lease.Acquire(human, meshes);
+            MorphReadiness.RememberLeasedMeshes(human);
             Visuals[human.Pointer] = visual;
             Log($"Native completion: acquired actor={visual.Id}, readable meshes={visual.Lease.ReadableCount}; applying before returning to native caller.");
         }
-        if (changes.Visibility) BellyVertexMorph.Invalidate(visual.Id);
+        if (changes.Visibility) BellyVertexMorph.InvalidateVisibility(visual.Id);
         BellyVertexMorph.Apply(human, visual.Id, growth);
     }
     private static void Release(IntPtr pointer)
@@ -491,7 +686,7 @@ internal static class PregnancyRuntime
         finally { visual.Lease.Dispose(); }
     }
     internal static void ReleaseMeshes(Human human) { if (human != null) Release(human.Pointer); }
-    internal static void ReleaseHuman(Human human) { ReleaseMeshes(human); BodyChangeRuntime.Release(human); }
+    internal static void ReleaseHuman(Human human) { if (human != null) AppearanceBindings.Remove(human.Pointer); ReleaseMeshes(human); BodyChangeRuntime.Release(human); }
     internal static void ReleaseVisuals()
     {
         foreach (var pointer in Visuals.Keys.ToArray()) Release(pointer);
