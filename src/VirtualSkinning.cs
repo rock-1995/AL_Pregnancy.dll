@@ -222,7 +222,9 @@ internal static partial class BellyVertexMorph
         return record.VirtualAlpha=alpha;
     }
 
-    // Called after the game's Human.LateUpdate, plus once immediately on rebuild.
+    // Body customization completes before Magica's cloth simulation. Rebuild
+    // immediately, but defer stable skirt palettes until physics has written
+    // the live bones; Magica restores their animation pose earlier each frame.
     // Only the matrix palette and bounds change each pose. Material attachment
     // is cached on rebuild; no geometric support or per-vertex upload follows.
     public static void UpdateVirtual(Human human)
@@ -239,10 +241,19 @@ internal static partial class BellyVertexMorph
                     catch(Exception e) { ReleaseVirtual(records);state.Virtual=null;Log.LogError("[VirtualAxis] Setup failed; native skinning retained: "+e); }
                     finally { FinishRebuild(state); }
                 }
-                else UpdateVirtualState(state,records);
+                else UpdateVirtualState(state,records,VirtualUpdatePhase.Body);
             }
     }
-    private static void UpdateVirtualState(CharaState state,List<MeshRecord> records)
+    // ClothUpdate completes its native jobs before returning. Visit only our
+    // existing bindings: no character discovery, rebuild, or vertex work here.
+    internal static void UpdateSkirtPhysics()
+    {
+        foreach(var pair in _state)
+            if(_records.TryGetValue(pair.Key,out var records) && records.Any(r=>r.Virtual?.Skirt!=null))
+                UpdateVirtualState(pair.Value,records,VirtualUpdatePhase.SkirtPhysics);
+    }
+    private enum VirtualUpdatePhase { Rebuild, Body, SkirtPhysics }
+    private static void UpdateVirtualState(CharaState state,List<MeshRecord> records,VirtualUpdatePhase phase=VirtualUpdatePhase.Rebuild)
     {
         var rig=state.Virtual;if(rig==null || rig.Failed)return;
         long started=System.Diagnostics.Stopwatch.GetTimestamp();
@@ -257,6 +268,8 @@ internal static partial class BellyVertexMorph
             foreach(var r in records)
             {
                 var binding=r.Virtual;
+                if(phase==VirtualUpdatePhase.Body && binding?.Skirt!=null ||
+                   phase==VirtualUpdatePhase.SkirtPhysics && binding?.Skirt==null)continue;
                 if(binding?.Skirt!=null && (binding.Renderer==null || binding.Renderer.sharedMesh!=binding.Mesh))
                 {binding.Restore();r.Virtual=null;continue;}
                 if(binding==null || binding.Renderer==null || binding.Renderer.sharedMesh!=binding.Mesh)continue;

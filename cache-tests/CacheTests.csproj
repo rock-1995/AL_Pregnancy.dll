@@ -8,6 +8,7 @@
     <Compile Include="ExtractedNearest.g.cs" />
     <Compile Include="../src/NearestBodyVertexMap.cs" Link="NearestBodyVertexMap.cs" />
     <Compile Include="../src/MatrixBridge.cs" Link="MatrixBridge.cs" />
+    <Compile Include="../src/MorphMath.cs" Link="MorphMath.cs" />
   </ItemGroup>
   <Target Name="ExtractProductionNearest" BeforeTargets="BeforeCompile">
     <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/Extract-Nearest.ps1&quot;" />

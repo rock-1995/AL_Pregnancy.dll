@@ -32,7 +32,7 @@ internal static partial class BellyVertexMorph
                 float influence = BellyShape.DeformationInfluence(rec.BellyInfluence == null ? 1 : rec.BellyInfluence[i], local, frame.Profile, BellyDeformSettings.Vtx);
                 var delta = (BellyShape.Deform(local, frame.Profile, stage, BellyDeformSettings.Vtx) - local) * (influence * rec.ProtectionKeep[i]);
                 var meshDelta = NVector.TransformNormal(delta, deltaMap);
-                changed[i] += new Vector3(meshDelta.X, meshDelta.Y, meshDelta.Z);
+                changed[i] =MorphMath.Add(changed[i],MorphMath.V(meshDelta.X,meshDelta.Y,meshDelta.Z));
             }
             rec.LastNewV = changed; rec.Mesh.vertices = changed; rec.AppliedSig = Sig(changed);
         }

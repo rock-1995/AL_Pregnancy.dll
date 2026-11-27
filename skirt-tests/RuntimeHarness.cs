@@ -107,13 +107,21 @@ internal static partial class BellyVertexMorph
             {
                 var world=NMatrix.CreateRotationY(.4f)*NMatrix.CreateTranslation(2,3,-1);
                 foreach(var bone in bodyBones)bone.localToWorldMatrix=MatrixBridge.ToUnity(world);
+                // Magica restores its animation pose before Human.LateUpdate.
+                // Stable native completion must leave the skirt palette alone.
+                for(int b=0;b<bones.Length;b++)
+                    bones[b].localToWorldMatrix=MatrixBridge.ToUnity(MatrixBridge.ToManaged(binds[b].inverse)*world);
+                int tick=binding.Tick;
+                UpdateVirtual(human);
+                Program.Check(binding.Tick==tick,"stable native completion defers skirt palette until physics");
                 for(int b=0;b<bones.Length;b++)
                 {
                     var swing=pose==0?NMatrix.Identity:NMatrix.CreateRotationX(pose*.17f+b*.015f);
                     bones[b].localToWorldMatrix=MatrixBridge.ToUnity(MatrixBridge.ToManaged(binds[b].inverse)*(data.Controlled[b]?swing:NMatrix.Identity)*world);
                 }
                 var before=bones.Select(b=>b.localToWorldMatrix.Rows).ToArray();
-                UpdateVirtualState(state,records);
+                UpdateSkirtPhysics();
+                Program.Check(binding.Tick==tick+1,"exactly one skirt palette evaluation per stable frame");
                 Program.Check(mesh.VertexWrites==writes,"pose uses palette only");
                 Program.Check(before.SequenceEqual(bones.Select(b=>b.localToWorldMatrix.Rows)),"native skirt transforms untouched");
                 for(int i=0;i<mesh.vertices.Length;i++)
@@ -152,7 +160,7 @@ internal static partial class BellyVertexMorph
                 PrepareVirtual(state,records,1);
             }
             var replacement=new Mesh {name="replacement"};renderer.sharedMesh=replacement;
-            UpdateVirtualState(state,records);
+            UpdateSkirtPhysics();
             Program.Check(record.Virtual==null&&renderer.sharedMesh==replacement&&mesh.vertices.SequenceEqual(record.LastNewV),"replacement restores old skirt without touching new mesh");
             renderer.sharedMesh=mesh;renderer.bones=bones;
             state.Virtual=null; record.VirtualAlpha=null; // Shape changes invalidate these caches in production.
@@ -160,7 +168,7 @@ internal static partial class BellyVertexMorph
             // Simulate missing native physics bone. Production failure path must
             // restore all binding and residual writes, not leave a collapsed hem.
             record.Virtual.Bones[1]=null;
-            UpdateVirtualState(state,records);
+            UpdateSkirtPhysics();
             Program.Check(record.Virtual==null&&mesh.vertices.SequenceEqual(record.LastNewV),"failure restores direct geometry");
             bones[1]=new Transform {name="cf_j_sk_00_00",localToWorldMatrix=binds[1].inverse};
             state.Virtual=null; record.VirtualAlpha=null;
@@ -208,6 +216,9 @@ internal static partial class BellyVertexMorph
             var motion=NMatrix.CreateRotationX(angle)*NMatrix.CreateTranslation(0,0,angle*.1f);
             root.localToWorldMatrix=skin.localToWorldMatrix=MatrixBridge.ToUnity(motion);
             UpdateVirtual(human);
+            int tick=record.Virtual.Tick;
+            UpdateSkirtPhysics();
+            Program.Check(record.Virtual.Tick==tick,"cloth completion does not repeat body-only palettes");
             Program.Near(NVector.Transform(NVector.UnitY,state.Virtual.Last.Transform),NVector.Transform(NVector.UnitY,expectedAxis),"waist jiggle no longer drives abdominal axis");
             for(int i=0;i<positions.Length;i++)
             {

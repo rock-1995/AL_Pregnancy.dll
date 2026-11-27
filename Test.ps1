@@ -1,6 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$GameDir)
 $ErrorActionPreference='Stop'
 $projects=@(
+    'math-tests/MathTests.csproj',
     'breast-physics-tests/BreastPhysicsRegression.csproj',
     'unrestricted-tests/UnrestrictedRegression.csproj',
     'tests/SelectionRegression.csproj',

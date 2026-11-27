@@ -9,7 +9,7 @@ using UnityEngine;
 namespace ALPregnancy;
 
 // Preserve the legacy ID so existing configuration and plugin references remain valid.
-[BepInPlugin("local.al.pregnancy.preview", "AL Pregnancy", "0.3.5")]
+[BepInPlugin("local.al.pregnancy.preview", "AL Pregnancy", "0.3.7")]
 [BepInDependency(PatchCompatibility.UncensorGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInProcess("AmanatsuLocation.exe")]
 public sealed class PregnancyPlugin : BasePlugin
@@ -52,13 +52,15 @@ public sealed class PregnancyPlugin : BasePlugin
             prefix: new HarmonyMethod(typeof(PregnancyPlugin), nameof(BeforeHumanDispose)));
         _harmony.Patch(AccessTools.Method(typeof(Human), "LateUpdate"),
             postfix: new HarmonyMethod(typeof(PregnancyPlugin), nameof(AfterHumanLateUpdate)) { priority = Priority.Last });
+        _harmony.Patch(AccessTools.Method(typeof(MagicaCloth2.ClothManager), nameof(MagicaCloth2.ClothManager.ClothUpdate)),
+            postfix: new HarmonyMethod(typeof(BellyVertexMorph), nameof(BellyVertexMorph.UpdateSkirtPhysics)) { priority = Priority.Last });
         _harmony.Patch(AccessTools.Method(typeof(HumanBody), nameof(HumanBody.UpdateShapeBody)),
             postfix: new HarmonyMethod(typeof(BodyChangeRuntime), nameof(BodyChangeRuntime.NativeShapeUpdated)) { priority = Priority.Last });
         PregnancyRuntime.Install(_harmony);
         BodyChangeAnimation.Install(_harmony);
         MorphReadiness.Install(_harmony);
         BellyVertexMorph.InstallCollisionSync(_harmony);
-        Log.LogInfo("AL Pregnancy 0.3.5 loaded. Native breast collision input bridge available; unreadable garment panels use private readable copies; maker appearance values use external save v4.");
+        Log.LogInfo("AL Pregnancy 0.3.7 loaded. Skirt palettes follow completed native cloth physics; managed morph math and maker appearance save v4 retained.");
     }
 
     internal static void TickStartupConfig() => _startupConfig?.Tick(Time.unscaledTime);

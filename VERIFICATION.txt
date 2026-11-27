@@ -1,3 +1,8 @@
+AL Pregnancy 0.3.7
+The tested skirt update follows the current frame's native cloth pose. The isolated
+Unity 6000.0.65f1 test passed in all 120 measured frames. The previous 0.3.6
+build reproduced the timing issue in all 120 frames.
+
 AL Pregnancy 0.3.5 - release verification, 2026-11-22
 
 The production source builds against AmanatsuLocation's current BepInEx/IL2CPP interop assemblies in Release net6.0 with 0 warnings and 0 errors. The release DLL identity is listed in SHA256SUMS.txt; game/framework dependency binaries are not distributed.

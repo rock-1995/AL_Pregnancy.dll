@@ -136,6 +136,7 @@ namespace ALPregnancy
 
         private class BodyAnchorContext
         {
+            public BodyAnchorSearch Search;
             public readonly List<BodyAnchorMesh> Meshes = new();
             public readonly List<BodyAnchorPoint> Points = new();
             public readonly Dictionary<int, List<int>> Buckets = new();
@@ -245,7 +246,7 @@ namespace ALPregnancy
         public static void Apply(Human human, int charaId, float rate)
         {
             if (human == null) return;
-            rate = Mathf.Clamp01(rate);
+            rate = MorphMath.Clamp01(rate);
 
             IntPtr humanPtr = IntPtr.Zero;
             try { humanPtr = human.Pointer; } catch { }
@@ -571,10 +572,10 @@ namespace ALPregnancy
                         if (live.Length != expected.Length) mismatches = -1;
                         else for (int i = 0; i < live.Length; i++)
                         {
-                            if ((live[i] - expected[i]).sqrMagnitude > 1e-12f) mismatches++;
-                            float distance = (live[i] - rec.OrigVerts[i]).magnitude;
+                            if (MorphMath.SqrMagnitude((MorphMath.Subtract(live[i],expected[i]))) > 1e-12f) mismatches++;
+                            float distance = MorphMath.Magnitude((MorphMath.Subtract(live[i],rec.OrigVerts[i])));
                             if (distance > 1e-6f) liveMoved++;
-                            maxDelta = Mathf.Max(maxDelta, distance);
+                            maxDelta = MorphMath.Max(maxDelta,distance);
                         }
                         bool attached = rec.Renderer != null && rec.Renderer.sharedMesh == rec.Mesh;
                         bool active = rec.Renderer != null && rec.Renderer.enabled && rec.Renderer.gameObject.activeInHierarchy;
@@ -669,15 +670,15 @@ namespace ALPregnancy
                     if (bw <= 0f) continue;
 
                     float disp = (deformed && rec.OrigVerts != null)
-                        ? (rec.LastNewV[i] - rec.OrigVerts[i]).magnitude : 0f;
+                        ? MorphMath.Magnitude((MorphMath.Subtract(rec.LastNewV[i],rec.OrigVerts[i]))) : 0f;
                     int wRep  = hasWG ? rec.NormalWeldGroup[i] : -1;
 
-                    var oN = hasON                                ? rec.OrigNormals[i]  : Vector3.zero;
-                    var rN = recalcN != null                      ? recalcN[i]          : Vector3.zero;
-                    var lN = (liveN != null && liveN.Length == n) ? liveN[i]            : Vector3.zero;
+                    var oN = hasON                                ? rec.OrigNormals[i]  : MorphMath.V(0,0,0);
+                    var rN = recalcN != null                      ? recalcN[i]          : MorphMath.V(0,0,0);
+                    var lN = (liveN != null && liveN.Length == n) ? liveN[i]            : MorphMath.V(0,0,0);
 
                     // "changed" = RecalculateNormalsWelded produces a different normal than OrigNormals
-                    bool changed  = recalcN != null && hasON && (oN - rN).sqrMagnitude > 1e-6f;
+                    bool changed  = recalcN != null && hasON && MorphMath.SqrMagnitude((MorphMath.Subtract(oN,rN))) > 1e-6f;
                     // Partial breast weights now retain normals for their deformed surface.
                     bool restored = hasON && BreastExclusion.Contains(rec.BreastExcluded, i);
 
@@ -1174,8 +1175,8 @@ namespace ALPregnancy
                         int bpLen = bp?.Length ?? 0;
                         if (bpLen > st.PelvisIdx && bpLen > st.SpineIdx)
                         {
-                            pelvisL      = bp[st.PelvisIdx].inverse.MultiplyPoint3x4(Vector3.zero);
-                            spineL       = bp[st.SpineIdx].inverse.MultiplyPoint3x4(Vector3.zero);
+                            pelvisL      = MorphMath.MultiplyPoint3x4(bp[st.PelvisIdx].inverse,MorphMath.V(0,0,0));
+                            spineL       = MorphMath.MultiplyPoint3x4(bp[st.SpineIdx].inverse,MorphMath.V(0,0,0));
                             bindPoseUsed = true;
                         }
                         else goto LiveFallback;
@@ -1194,37 +1195,37 @@ namespace ALPregnancy
                 }
 
                 AfterPelvisSpine:
-                Vector3 upRaw = spineL - pelvisL;
-                if (upRaw.sqrMagnitude < 1e-8f) return false;
-                float   boneLen = upRaw.magnitude;
-                Vector3 up      = upRaw / boneLen;
+                Vector3 upRaw = MorphMath.Subtract(spineL,pelvisL);
+                if (MorphMath.SqrMagnitude(upRaw) < 1e-8f) return false;
+                float   boneLen = MorphMath.Magnitude(upRaw);
+                Vector3 up      = MorphMath.Divide(upRaw,boneLen);
                 // This recorded AL rest mesh is Y-up. Snap a near-vertical short
                 // helper-bone axis to mesh vertical to avoid lifting the navel
                 // merely because the forward axis was tilted by five percent.
-                if (Vector3.Dot(up, Vector3.up) > 0.98f) up = Vector3.up;
+                if (MorphMath.Dot(up,MorphMath.V(0,1,0)) > 0.98f) up = MorphMath.V(0,1,0);
 
                 // Lateral axis from thigh bones
-                Vector3 right = Vector3.right;
+                Vector3 right = MorphMath.V(1,0,0);
                 try
                 {
-                    Vector3 lL = Vector3.zero, rL = Vector3.zero;
+                    Vector3 lL = MorphMath.V(0,0,0), rL = MorphMath.V(0,0,0);
                     bool gotLat = false;
                     if (bindPoseUsed && st.LThighIdx >= 0 && st.RThighIdx >= 0)
                     {
                         var bp = smr.sharedMesh.bindposes;
                         if (bp.Length > st.LThighIdx && bp.Length > st.RThighIdx)
-                        { lL = bp[st.LThighIdx].inverse.MultiplyPoint3x4(Vector3.zero); rL = bp[st.RThighIdx].inverse.MultiplyPoint3x4(Vector3.zero); gotLat = true; }
+                        { lL = MorphMath.MultiplyPoint3x4(bp[st.LThighIdx].inverse,MorphMath.V(0,0,0)); rL = MorphMath.MultiplyPoint3x4(bp[st.RThighIdx].inverse,MorphMath.V(0,0,0)); gotLat = true; }
                     }
                     if (gotLat)
                     {
-                        Vector3 tv = rL - lL; tv -= up * Vector3.Dot(tv, up);
-                        if (tv.sqrMagnitude > 1e-8f) right = tv.normalized;
+                        Vector3 tv = MorphMath.Subtract(rL,lL); tv =MorphMath.Subtract(tv,MorphMath.Multiply(up,MorphMath.Dot(tv,up)));
+                        if (MorphMath.SqrMagnitude(tv) > 1e-8f) right = MorphMath.Normalize(tv);
                     }
                 }
                 catch { }
 
-                Vector3 fwd = Vector3.Cross(up, right).normalized;
-                if (Vector3.Dot(fwd, Vector3.forward) < 0f) { fwd = -fwd; right = Vector3.Cross(up, fwd).normalized; }
+                Vector3 fwd = MorphMath.Normalize(MorphMath.Cross(up,right));
+                if (MorphMath.Dot(fwd,MorphMath.V(0,0,1)) < 0f) { fwd = MorphMath.Negate(fwd); right = MorphMath.Normalize(MorphMath.Cross(up,fwd)); }
 
                 Vector3 center = pelvisL;
 
@@ -1331,9 +1332,9 @@ namespace ALPregnancy
                                 int bj = (nearestBodyVertIdx != null && i < nearestBodyVertIdx.Length)
                                          ? nearestBodyVertIdx[i] : -1;
                                 Vector3 delta = (bj >= 0)
-                                    ? bodyRec.LastNewV[bj] - bodyRec.OrigVerts[bj]
-                                    : Vector3.zero;
-                                newV[i] = overlayRec.OrigVerts[i] + entry.FromBody.MultiplyVector(delta);
+                                    ? MorphMath.Subtract(bodyRec.LastNewV[bj],bodyRec.OrigVerts[bj])
+                                    : MorphMath.V(0,0,0);
+                                newV[i] = MorphMath.Add(overlayRec.OrigVerts[i],entry.FromBody.MultiplyVector(delta));
                             }
 
                             smr.sharedMesh.vertices = newV;
@@ -1686,9 +1687,9 @@ namespace ALPregnancy
                     for (int i = 0; i < rec.OrigVerts.Length; i++)
                     {
                         if (rec.BreastExcluded[i]) continue;
-                        var point = hasMeshConversion ? clothToBodyMatrix.MultiplyPoint3x4(rec.OrigVerts[i]) : rec.OrigVerts[i];
+                        var point = hasMeshConversion ? MorphMath.MultiplyPoint3x4(clothToBodyMatrix,rec.OrigVerts[i]) : rec.OrigVerts[i];
                         if (TryFindNearestBodyAnchorPoint(bodyAnchor, point, false, out var anchor) &&
-                            (anchor.Original - point).sqrMagnitude <= reachSq &&
+                            MorphMath.SqrMagnitude((MorphMath.Subtract(anchor.Original,point))) <= reachSq &&
                             BreastExclusion.Contains(bodyAnchor.Meshes[anchor.MeshIndex].BreastExcluded, anchor.VertexIndex))
                             rec.BreastExcluded[i] = true;
                     }
@@ -1703,9 +1704,9 @@ namespace ALPregnancy
                     float reachSq = fr.Profile.Span * fr.Profile.Span * .04f;
                     for (int i = 0; i < rec.OrigVerts.Length; i++)
                     {
-                        var point = hasMeshConversion ? clothToBodyMatrix.MultiplyPoint3x4(rec.OrigVerts[i]) : rec.OrigVerts[i];
+                        var point = hasMeshConversion ? MorphMath.MultiplyPoint3x4(clothToBodyMatrix,rec.OrigVerts[i]) : rec.OrigVerts[i];
                         if (TryFindNearestBodyAnchorPoint(bodyAnchor, point, false, out var anchor) &&
-                            (anchor.Original - point).sqrMagnitude <= reachSq)
+                            MorphMath.SqrMagnitude((MorphMath.Subtract(anchor.Original,point))) <= reachSq)
                             rec.ProtectionKeep[i] = BodyProtection.Keep(bodyAnchor.Meshes[anchor.MeshIndex].ProtectionKeep, anchor.VertexIndex);
                     }
                 }
@@ -1720,7 +1721,7 @@ namespace ALPregnancy
                 for (int i = 0; i < n; i++)
                 {
                     Vector3 sourceLv = rec.OrigVerts[i];
-                    Vector3 lv = hasMeshConversion ? clothToBodyMatrix.MultiplyPoint3x4(sourceLv)
+                    Vector3 lv = hasMeshConversion ? MorphMath.MultiplyPoint3x4(clothToBodyMatrix,sourceLv)
                                : sourceLv;
                     newV[i] = sourceLv;
                     if (bodyOrig != null)
@@ -1733,29 +1734,29 @@ namespace ALPregnancy
                     // Skin uses continuous weight values; clothing has no binary mask.
                     if (rec.BreastExcluded[i]) continue;
 
-                    Vector3 d = lv - fr.Center;
-                    var local = new System.Numerics.Vector3(Vector3.Dot(d, fr.Right), Vector3.Dot(d, fr.Up), Vector3.Dot(d, fr.Fwd));
+                    Vector3 d = MorphMath.Subtract(lv,fr.Center);
+                    var local = new System.Numerics.Vector3(MorphMath.Dot(d,fr.Right), MorphMath.Dot(d,fr.Up), MorphMath.Dot(d,fr.Fwd));
                     float influence = BellyShape.DeformationInfluence(rec.BellyInfluence == null ? 1f : rec.BellyInfluence[i], local, fr.Profile, p);
                     if (influence <= 0) continue;
                     var shape = BellyShape.Deform(local, fr.Profile, rate, p);
                     var delta = shape - local;
-                    Vector3 nlv = lv + fr.Right * delta.X + fr.Up * delta.Y + fr.Fwd * delta.Z;
-                    nlv = Vector3.Lerp(lv, nlv, influence * BodyProtection.Keep(rec.ProtectionKeep, i));
+                    Vector3 nlv = MorphMath.Add(MorphMath.Add(MorphMath.Add(lv,MorphMath.Multiply(fr.Right,delta.X)),MorphMath.Multiply(fr.Up,delta.Y)),MorphMath.Multiply(fr.Fwd,delta.Z));
+                    nlv = MorphMath.Lerp(lv,nlv,influence * BodyProtection.Keep(rec.ProtectionKeep, i));
 
                     // Breast-owned vertices were excluded before shape evaluation.
 
                     if (isCloth)
                     {
                         float clothMul = clothMultiplier;
-                        nlv = lv + (nlv - lv) * clothMul;
+                        nlv = MorphMath.Add(lv,MorphMath.Multiply((MorphMath.Subtract(nlv,lv)),clothMul));
                         // Preserve even tiny raw offsets until the original
                         // attachment formula has run below.
                         bodyNew[i] = nlv;
                     }
 
-                    if ((nlv - lv).sqrMagnitude < 1e-14f) continue;
+                    if (MorphMath.SqrMagnitude((MorphMath.Subtract(nlv,lv))) < 1e-14f) continue;
                     if (bodyNew != null) bodyNew[i] = nlv;
-                    else newV[i] = hasMeshConversion ? bodyToClothMatrix.MultiplyPoint3x4(nlv) : nlv;
+                    else newV[i] = hasMeshConversion ? MorphMath.MultiplyPoint3x4(bodyToClothMatrix,nlv) : nlv;
                     if (moved != null) moved[i] = true;
                     deformed++;
                 }
@@ -1766,13 +1767,13 @@ namespace ALPregnancy
                     for (int i = 0; i < n; i++)
                     {
                         if (rec.BreastExcluded[i]) continue;
-                        var lv = bodyOrig[i]; var d = lv - fr.Center;
-                        var local = new System.Numerics.Vector3(Vector3.Dot(d, fr.Right), Vector3.Dot(d, fr.Up), Vector3.Dot(d, fr.Fwd));
+                        var lv = bodyOrig[i]; var d = MorphMath.Subtract(lv,fr.Center);
+                        var local = new System.Numerics.Vector3(MorphMath.Dot(d,fr.Right), MorphMath.Dot(d,fr.Up), MorphMath.Dot(d,fr.Fwd));
                         float attachmentWeight = BellyShape.ClothingFootprint(local, fr.Profile, rate, p);
                         if (attachmentWeight > 0f && bodyAnchor != null && bodyAnchor.SurfaceTriangles.Count > 0 &&
                             TryGetBodySurfaceClothTarget(bodyAnchor, lv, clothMultiplier, fr, out Vector3 surfaceTarget))
-                            bodyNew[i] = Vector3.Lerp(bodyNew[i], surfaceTarget, attachmentWeight);
-                        moved[i] = (bodyNew[i] - lv).sqrMagnitude >= 1e-14f;
+                            bodyNew[i] = MorphMath.Lerp(bodyNew[i],surfaceTarget,attachmentWeight);
+                        moved[i] = MorphMath.SqrMagnitude((MorphMath.Subtract(bodyNew[i],lv))) >= 1e-14f;
                         if (moved[i]) deformed++;
                         else bodyNew[i] = lv;
                     }
@@ -1795,7 +1796,7 @@ namespace ALPregnancy
                             newV[i] = rec.OrigVerts[i];
                             continue;
                         }
-                        newV[i] = hasMeshConversion ? bodyToClothMatrix.MultiplyPoint3x4(bodyNew[i])
+                        newV[i] = hasMeshConversion ? MorphMath.MultiplyPoint3x4(bodyToClothMatrix,bodyNew[i])
                                 : bodyNew[i];
                     }
                 }
@@ -1811,9 +1812,9 @@ namespace ALPregnancy
                 rec.MaxDisplacement = 0;
                 for (int i = 0; i < newV.Length; i++)
                 {
-                    float distance = (newV[i] - rec.OrigVerts[i]).magnitude;
+                    float distance = MorphMath.Magnitude((MorphMath.Subtract(newV[i],rec.OrigVerts[i])));
                     if (distance > 1e-6f) rec.ActualMoved++;
-                    rec.MaxDisplacement = Mathf.Max(rec.MaxDisplacement, distance);
+                    rec.MaxDisplacement = MorphMath.Max(rec.MaxDisplacement,distance);
                 }
                 RuntimeLogInfo($"[VtxMorph] MeshCompute mesh={mesh.name} active={smr.gameObject.activeInHierarchy && smr.enabled} body={BodyMeshSelection.IsBodyPiece(smr)} changed={rec.ActualMoved} maxMeshDelta={rec.MaxDisplacement:F5}");
 
@@ -1922,8 +1923,8 @@ namespace ALPregnancy
                     Triangles = rec.Mesh.triangles,
                     DetailProtection = Array.ConvertAll(rec.OrigVerts,v => {
                         var point=System.Numerics.Vector3.Transform(new System.Numerics.Vector3(v.x,v.y,v.z),rec.ToReference);
-                        var offset=new Vector3(point.X,point.Y,point.Z)-frame.Center;
-                        float x=Vector3.Dot(offset,frame.Right),y=Vector3.Dot(offset,frame.Up),z=Vector3.Dot(offset,frame.Fwd);
+                        var offset=MorphMath.Subtract(MorphMath.V(point.X,point.Y,point.Z),frame.Center);
+                        float x=MorphMath.Dot(offset,frame.Right),y=MorphMath.Dot(offset,frame.Up),z=MorphMath.Dot(offset,frame.Fwd);
                         var profile=frame.Profile;
                         if(profile==null || !float.IsFinite(profile.SkinNavelZ) || z<=profile.AxisAt(y))return 0f;
                         float radius=MathF.Abs(VirtualAxisMath.NonZero(BellyDeformSettings.Vtx.NavelRadius))*profile.Span;
@@ -1957,9 +1958,9 @@ namespace ALPregnancy
                 rec.MaxDisplacement = 0;
                 for (int i = 0; i < verts.Length; i++)
                 {
-                    float distance = (verts[i] - rec.OrigVerts[i]).magnitude;
+                    float distance = MorphMath.Magnitude((MorphMath.Subtract(verts[i],rec.OrigVerts[i])));
                     if (distance > 1e-6f) rec.ActualMoved++;
-                    rec.MaxDisplacement = Mathf.Max(rec.MaxDisplacement, distance);
+                    rec.MaxDisplacement = MorphMath.Max(rec.MaxDisplacement,distance);
                 }
             }
             if(log) RuntimeLogInfo($"[VtxMorph] SkinShading mode=fixed-corner-transport smoothing={BellyDeformSettings.Vtx.SkinShadingSmoothing:F2} activeParts={skin.Count} weldGroups={result.WeldGroups} crossPartGroups={result.CrossPartGroups} maxSeamCorrection={result.MaxSeamDelta:F6}");
@@ -1969,12 +1970,12 @@ namespace ALPregnancy
             => Array.ConvertAll(vectors, v => new System.Numerics.Vector3(v.x, v.y, v.z));
 
         private static Vector3[] ToUnityVectors(System.Numerics.Vector3[] vectors)
-            => Array.ConvertAll(vectors, v => new Vector3(v.X, v.Y, v.Z));
+            => Array.ConvertAll(vectors, v => MorphMath.V(v.X,v.Y,v.Z));
 
         private static BodyAnchorContext CreateBodyAnchorContext(LocalFrame fr)
         {
-            float cell = Mathf.Max(fr.BoneLen * 0.25f, 0.005f);
-            float minMoved = Mathf.Max(fr.BoneLen * 0.0001f, 0.000001f);
+            float cell = MorphMath.Max(fr.BoneLen * 0.25f,0.005f);
+            float minMoved = MorphMath.Max(fr.BoneLen * 0.0001f,0.000001f);
             return new BodyAnchorContext
             {
                 CellSize = cell,
@@ -2000,6 +2001,8 @@ namespace ALPregnancy
                 }
                 list.Add(i);
             }
+            // Preserve the legacy fallback for malformed nonfinite source data.
+            context.Search = context.Points.All(p => IsFinite(p.Original)) ? new BodyAnchorSearch(context) : null;
         }
 
         private static void AddBodyAnchorMesh(
@@ -2036,15 +2039,15 @@ namespace ALPregnancy
             var meshToReference = MatrixBridge.ToUnity(rec.ToReference);
             for (int i = 0; i < count; i++)
             {
-                anchorMesh.Original[i] = meshToReference.MultiplyPoint3x4(rec.OrigVerts[i]);
-                anchorMesh.Morphed[i] = meshToReference.MultiplyPoint3x4(morphedVerts[i]);
+                anchorMesh.Original[i] = MorphMath.MultiplyPoint3x4(meshToReference,rec.OrigVerts[i]);
+                anchorMesh.Morphed[i] = MorphMath.MultiplyPoint3x4(meshToReference,morphedVerts[i]);
                 anchorMesh.Valid[i] = true;
             }
 
             for (int i = 0; i < count; i++)
             {
                 if (!anchorMesh.Valid[i]) continue;
-                if ((anchorMesh.Morphed[i] - anchorMesh.Original[i]).sqrMagnitude < context.MinMovedSq) continue;
+                if (MorphMath.SqrMagnitude((MorphMath.Subtract(anchorMesh.Morphed[i],anchorMesh.Original[i]))) < context.MinMovedSq) continue;
                 anchorMesh.Affected[i] = true;
             }
 
@@ -2067,7 +2070,7 @@ namespace ALPregnancy
                     MeshIndex = meshIndex,
                     VertexIndex = i,
                     Original = anchorMesh.Original[i],
-                    OriginalUp = Vector3.Dot(anchorMesh.Original[i] - fr.Center, fr.Up),
+                    OriginalUp = MorphMath.Dot(MorphMath.Subtract(anchorMesh.Original[i],fr.Center),fr.Up),
                 });
                 added++;
             }
@@ -2098,7 +2101,7 @@ namespace ALPregnancy
             if (triangles == null || triangles.Length < 3)
                 return 0;
 
-            float minEdge = Mathf.Max(context.CellSize * 0.015f, 0.00001f);
+            float minEdge = MorphMath.Max(context.CellSize * 0.015f,0.00001f);
             float minArea = minEdge * minEdge;
             float minAreaSq = minArea * minArea;
             int count = anchorMesh.Original.Length;
@@ -2121,14 +2124,14 @@ namespace ALPregnancy
                 Vector3 p0 = anchorMesh.Original[a];
                 Vector3 p1 = anchorMesh.Original[b];
                 Vector3 p2 = anchorMesh.Original[c];
-                Vector3 normal = Vector3.Cross(p1 - p0, p2 - p0);
-                if (!IsFinite(normal) || normal.sqrMagnitude < minAreaSq)
+                Vector3 normal = MorphMath.Cross(MorphMath.Subtract(p1,p0),MorphMath.Subtract(p2,p0));
+                if (!IsFinite(normal) || MorphMath.SqrMagnitude(normal) < minAreaSq)
                     continue;
 
-                Vector3 center = (p0 + p1 + p2) / 3f;
-                float radiusSq = (p0 - center).sqrMagnitude;
-                radiusSq = Mathf.Max(radiusSq, (p1 - center).sqrMagnitude);
-                radiusSq = Mathf.Max(radiusSq, (p2 - center).sqrMagnitude);
+                Vector3 center = MorphMath.Divide((MorphMath.Add(MorphMath.Add(p0,p1),p2)),3f);
+                float radiusSq = MorphMath.SqrMagnitude((MorphMath.Subtract(p0,center)));
+                radiusSq = MorphMath.Max(radiusSq,MorphMath.SqrMagnitude((MorphMath.Subtract(p1,center))));
+                radiusSq = MorphMath.Max(radiusSq,MorphMath.SqrMagnitude((MorphMath.Subtract(p2,center))));
 
                 int triIndex = context.SurfaceTriangles.Count;
                 context.SurfaceTriangles.Add(new BodySurfaceTriangle
@@ -2181,15 +2184,15 @@ namespace ALPregnancy
         {
             if (context == null) return;
 
-            float minX = Mathf.Min(p0.x, Mathf.Min(p1.x, p2.x));
-            float minY = Mathf.Min(p0.y, Mathf.Min(p1.y, p2.y));
-            float minZ = Mathf.Min(p0.z, Mathf.Min(p1.z, p2.z));
-            float maxX = Mathf.Max(p0.x, Mathf.Max(p1.x, p2.x));
-            float maxY = Mathf.Max(p0.y, Mathf.Max(p1.y, p2.y));
-            float maxZ = Mathf.Max(p0.z, Mathf.Max(p1.z, p2.z));
+            float minX = MorphMath.Min(p0.x,MorphMath.Min(p1.x,p2.x));
+            float minY = MorphMath.Min(p0.y,MorphMath.Min(p1.y,p2.y));
+            float minZ = MorphMath.Min(p0.z,MorphMath.Min(p1.z,p2.z));
+            float maxX = MorphMath.Max(p0.x,MorphMath.Max(p1.x,p2.x));
+            float maxY = MorphMath.Max(p0.y,MorphMath.Max(p1.y,p2.y));
+            float maxZ = MorphMath.Max(p0.z,MorphMath.Max(p1.z,p2.z));
 
-            BodyAnchorBucketCoords(new Vector3(minX, minY, minZ), context.CellSize, out int minBx, out int minBy, out int minBz);
-            BodyAnchorBucketCoords(new Vector3(maxX, maxY, maxZ), context.CellSize, out int maxBx, out int maxBy, out int maxBz);
+            BodyAnchorBucketCoords(MorphMath.V(minX,minY,minZ), context.CellSize, out int minBx, out int minBy, out int minBz);
+            BodyAnchorBucketCoords(MorphMath.V(maxX,maxY,maxZ), context.CellSize, out int maxBx, out int maxBy, out int maxBz);
 
             for (int x = minBx; x <= maxBx; x++)
                 for (int y = minBy; y <= maxBy; y++)
@@ -2223,7 +2226,7 @@ namespace ALPregnancy
 
             Vector3 p0 = mesh.Original[index];
             Vector3 p0m = mesh.Morphed[index];
-            float minEdge = Mathf.Max(context.CellSize * 0.015f, 0.00001f);
+            float minEdge = MorphMath.Max(context.CellSize * 0.015f,0.00001f);
             float minArea = minEdge * minEdge;
             var candidates = new List<int>();
             var seen = new HashSet<int>();
@@ -2318,31 +2321,31 @@ namespace ALPregnancy
             if (index < 0 || index >= mesh.Original.Length || n1 < 0 || n1 >= mesh.Original.Length || n2 < 0 || n2 >= mesh.Original.Length)
                 return false;
 
-            Vector3 e1 = mesh.Original[n1] - p0;
-            Vector3 e2 = mesh.Original[n2] - p0;
-            Vector3 e1m = mesh.Morphed[n1] - p0m;
-            Vector3 e2m = mesh.Morphed[n2] - p0m;
-            float e1Len = e1.magnitude;
-            float e2Len = e2.magnitude;
-            float e1mLen = e1m.magnitude;
-            float e2mLen = e2m.magnitude;
+            Vector3 e1 = MorphMath.Subtract(mesh.Original[n1],p0);
+            Vector3 e2 = MorphMath.Subtract(mesh.Original[n2],p0);
+            Vector3 e1m = MorphMath.Subtract(mesh.Morphed[n1],p0m);
+            Vector3 e2m = MorphMath.Subtract(mesh.Morphed[n2],p0m);
+            float e1Len = MorphMath.Magnitude(e1);
+            float e2Len = MorphMath.Magnitude(e2);
+            float e1mLen = MorphMath.Magnitude(e1m);
+            float e2mLen = MorphMath.Magnitude(e2m);
             if (e1Len < minEdge || e2Len < minEdge || e1mLen < minEdge || e2mLen < minEdge)
                 return false;
 
-            Vector3 normal = Vector3.Cross(e1, e2);
-            Vector3 normalM = Vector3.Cross(e1m, e2m);
-            if (normal.magnitude < minArea || normalM.magnitude < minArea)
+            Vector3 normal = MorphMath.Cross(e1,e2);
+            Vector3 normalM = MorphMath.Cross(e1m,e2m);
+            if (MorphMath.Magnitude(normal) < minArea || MorphMath.Magnitude(normalM) < minArea)
                 return false;
-            float sin = normal.magnitude / Mathf.Max(e1Len * e2Len, 1e-9f);
-            float sinM = normalM.magnitude / Mathf.Max(e1mLen * e2mLen, 1e-9f);
+            float sin = MorphMath.Magnitude(normal) / MorphMath.Max(e1Len * e2Len,1e-9f);
+            float sinM = MorphMath.Magnitude(normalM) / MorphMath.Max(e1mLen * e2mLen,1e-9f);
             if (sin < 0.12f || sinM < 0.12f)
                 return false;
 
-            float stretch1 = e1mLen / Mathf.Max(e1Len, 1e-9f);
-            float stretch2 = e2mLen / Mathf.Max(e2Len, 1e-9f);
+            float stretch1 = e1mLen / MorphMath.Max(e1Len,1e-9f);
+            float stretch2 = e2mLen / MorphMath.Max(e2Len,1e-9f);
             if (stretch1 < 0.20f || stretch1 > 5.00f || stretch2 < 0.20f || stretch2 > 5.00f)
                 return false;
-            if (Vector3.Dot(normal.normalized, normalM.normalized) < -0.20f)
+            if (MorphMath.Dot(MorphMath.Normalize(normal),MorphMath.Normalize(normalM)) < -0.20f)
                 return false;
 
             basis.Valid = true;
@@ -2367,7 +2370,7 @@ namespace ALPregnancy
             if (!TryFindNearestBodySurfaceTriangle(context, original, out BodySurfaceHit hit))
                 return BodyAnchorMiss(context);
 
-            float maxDistance = Mathf.Max(fr.BoneLen * 4.0f, 0.035f);
+            float maxDistance = MorphMath.Max(fr.BoneLen * 4.0f,0.035f);
             if (hit.DistanceSq > maxDistance * maxDistance)
                 return BodyAnchorMiss(context);
 
@@ -2394,27 +2397,25 @@ namespace ALPregnancy
             Vector3 bm = ScaleAnchorMove(b, mesh.Morphed[tri.B], mul);
             Vector3 cm = ScaleAnchorMove(c, mesh.Morphed[tri.C], mul);
 
-            Vector3 normalM = Vector3.Cross(bm - am, cm - am);
-            float normalMLen = normalM.magnitude;
+            Vector3 normalM = MorphMath.Cross(MorphMath.Subtract(bm,am),MorphMath.Subtract(cm,am));
+            float normalMLen = MorphMath.Magnitude(normalM);
             if (normalMLen < 1e-9f || !IsFinite(normalM))
                 return BodyAnchorMiss(context);
-            normalM /= normalMLen;
+            normalM =MorphMath.Divide(normalM,normalMLen);
 
-            if (Vector3.Dot(hit.Normal, normalM) < -0.25f)
+            if (MorphMath.Dot(hit.Normal,normalM) < -0.25f)
                 return BodyAnchorMiss(context);
 
             Vector3 surfaceM =
-                am * hit.Barycentric.x +
-                bm * hit.Barycentric.y +
-                cm * hit.Barycentric.z;
-            var offset = original - hit.Closest;
+                MorphMath.Add(MorphMath.Add(MorphMath.Multiply(am,hit.Barycentric.x),MorphMath.Multiply(bm,hit.Barycentric.y)),MorphMath.Multiply(cm,hit.Barycentric.z));
+            var offset = MorphMath.Subtract(original,hit.Closest);
             var rotated = SurfaceAttachment.RotateOffset(
                 new System.Numerics.Vector3(offset.x, offset.y, offset.z),
                 new System.Numerics.Vector3(hit.Normal.x, hit.Normal.y, hit.Normal.z),
                 new System.Numerics.Vector3(normalM.x, normalM.y, normalM.z));
-            target = surfaceM + new Vector3(rotated.X, rotated.Y, rotated.Z);
-            float distanceFade = 1f - BellyShape.Smooth((Mathf.Sqrt(hit.DistanceSq) / maxDistance - 0.75f) / 0.25f);
-            target = Vector3.Lerp(original, target, distanceFade);
+            target = MorphMath.Add(surfaceM,MorphMath.V(rotated.X,rotated.Y,rotated.Z));
+            float distanceFade = 1f - BellyShape.Smooth((MorphMath.Sqrt(hit.DistanceSq) / maxDistance - 0.75f) / 0.25f);
+            target = MorphMath.Lerp(original,target,distanceFade);
             if (!IsFinite(target))
                 return BodyAnchorMiss(context);
 
@@ -2537,15 +2538,15 @@ namespace ALPregnancy
             if (!TryClosestPointOnTriangle(point, a, b, c, out Vector3 closest, out Vector3 barycentric))
                 return;
 
-            float sq = (point - closest).sqrMagnitude;
+            float sq = MorphMath.SqrMagnitude((MorphMath.Subtract(point,closest)));
             if (sq >= bestSq)
                 return;
 
-            Vector3 normal = Vector3.Cross(b - a, c - a);
-            float normalLen = normal.magnitude;
+            Vector3 normal = MorphMath.Cross(MorphMath.Subtract(b,a),MorphMath.Subtract(c,a));
+            float normalLen = MorphMath.Magnitude(normal);
             if (normalLen < 1e-9f || !IsFinite(normal))
                 return;
-            normal /= normalLen;
+            normal =MorphMath.Divide(normal,normalLen);
 
             found = true;
             bestSq = sq;
@@ -2568,23 +2569,23 @@ namespace ALPregnancy
             out Vector3 barycentric)
         {
             closest = a;
-            barycentric = new Vector3(1f, 0f, 0f);
+            barycentric = MorphMath.V(1f,0f,0f);
 
-            Vector3 ab = b - a;
-            Vector3 ac = c - a;
-            Vector3 ap = point - a;
-            float d1 = Vector3.Dot(ab, ap);
-            float d2 = Vector3.Dot(ac, ap);
+            Vector3 ab = MorphMath.Subtract(b,a);
+            Vector3 ac = MorphMath.Subtract(c,a);
+            Vector3 ap = MorphMath.Subtract(point,a);
+            float d1 = MorphMath.Dot(ab,ap);
+            float d2 = MorphMath.Dot(ac,ap);
             if (d1 <= 0f && d2 <= 0f)
                 return IsFinite(closest);
 
-            Vector3 bp = point - b;
-            float d3 = Vector3.Dot(ab, bp);
-            float d4 = Vector3.Dot(ac, bp);
+            Vector3 bp = MorphMath.Subtract(point,b);
+            float d3 = MorphMath.Dot(ab,bp);
+            float d4 = MorphMath.Dot(ac,bp);
             if (d3 >= 0f && d4 <= d3)
             {
                 closest = b;
-                barycentric = new Vector3(0f, 1f, 0f);
+                barycentric = MorphMath.V(0f,1f,0f);
                 return IsFinite(closest);
             }
 
@@ -2592,20 +2593,20 @@ namespace ALPregnancy
             if (vc <= 0f && d1 >= 0f && d3 <= 0f)
             {
                 float denom = d1 - d3;
-                if (Mathf.Abs(denom) < 1e-9f) return false;
+                if (MorphMath.Abs(denom) < 1e-9f) return false;
                 float v = d1 / denom;
-                closest = a + ab * v;
-                barycentric = new Vector3(1f - v, v, 0f);
+                closest = MorphMath.Add(a,MorphMath.Multiply(ab,v));
+                barycentric = MorphMath.V(1f - v,v,0f);
                 return IsFinite(closest);
             }
 
-            Vector3 cp = point - c;
-            float d5 = Vector3.Dot(ab, cp);
-            float d6 = Vector3.Dot(ac, cp);
+            Vector3 cp = MorphMath.Subtract(point,c);
+            float d5 = MorphMath.Dot(ab,cp);
+            float d6 = MorphMath.Dot(ac,cp);
             if (d6 >= 0f && d5 <= d6)
             {
                 closest = c;
-                barycentric = new Vector3(0f, 0f, 1f);
+                barycentric = MorphMath.V(0f,0f,1f);
                 return IsFinite(closest);
             }
 
@@ -2613,10 +2614,10 @@ namespace ALPregnancy
             if (vb <= 0f && d2 >= 0f && d6 <= 0f)
             {
                 float denom = d2 - d6;
-                if (Mathf.Abs(denom) < 1e-9f) return false;
+                if (MorphMath.Abs(denom) < 1e-9f) return false;
                 float w = d2 / denom;
-                closest = a + ac * w;
-                barycentric = new Vector3(1f - w, 0f, w);
+                closest = MorphMath.Add(a,MorphMath.Multiply(ac,w));
+                barycentric = MorphMath.V(1f - w,0f,w);
                 return IsFinite(closest);
             }
 
@@ -2624,23 +2625,23 @@ namespace ALPregnancy
             if (va <= 0f && (d4 - d3) >= 0f && (d5 - d6) >= 0f)
             {
                 float denom = (d4 - d3) + (d5 - d6);
-                if (Mathf.Abs(denom) < 1e-9f) return false;
+                if (MorphMath.Abs(denom) < 1e-9f) return false;
                 float w = (d4 - d3) / denom;
-                closest = b + (c - b) * w;
-                barycentric = new Vector3(0f, 1f - w, w);
+                closest = MorphMath.Add(b,MorphMath.Multiply((MorphMath.Subtract(c,b)),w));
+                barycentric = MorphMath.V(0f,1f - w,w);
                 return IsFinite(closest);
             }
 
             float sum = va + vb + vc;
-            if (Mathf.Abs(sum) < 1e-9f)
+            if (MorphMath.Abs(sum) < 1e-9f)
                 return false;
 
             float inv = 1f / sum;
             float vFace = vb * inv;
             float wFace = vc * inv;
             float uFace = 1f - vFace - wFace;
-            closest = a * uFace + b * vFace + c * wFace;
-            barycentric = new Vector3(uFace, vFace, wFace);
+            closest = MorphMath.Add(MorphMath.Add(MorphMath.Multiply(a,uFace),MorphMath.Multiply(b,vFace)),MorphMath.Multiply(c,wFace));
+            barycentric = MorphMath.V(uFace,vFace,wFace);
             return IsFinite(closest) && IsFinite(barycentric);
         }
 
@@ -2674,8 +2675,8 @@ namespace ALPregnancy
             float mul = clothMultiplier;
             Vector3 p0 = mesh.Original[p0Index];
             Vector3 p0m = ScaleAnchorMove(mesh.Original[p0Index], mesh.Morphed[p0Index], mul);
-            Vector3 originalOffset = original - p0;
-            float distance = originalOffset.magnitude;
+            Vector3 originalOffset = MorphMath.Subtract(original,p0);
+            float distance = MorphMath.Magnitude(originalOffset);
             if (distance < 1e-7f)
             {
                 target = p0m;
@@ -2687,16 +2688,16 @@ namespace ALPregnancy
             Vector3 local = basis.OriginalInverse.MultiplyVector(originalOffset);
             Vector3 n1m = ScaleAnchorMove(mesh.Original[basis.Neighbor1], mesh.Morphed[basis.Neighbor1], mul);
             Vector3 n2m = ScaleAnchorMove(mesh.Original[basis.Neighbor2], mesh.Morphed[basis.Neighbor2], mul);
-            Vector3 e1m = n1m - p0m;
-            Vector3 e2m = n2m - p0m;
-            Vector3 normalM = Vector3.Cross(e1m, e2m);
+            Vector3 e1m = MorphMath.Subtract(n1m,p0m);
+            Vector3 e2m = MorphMath.Subtract(n2m,p0m);
+            Vector3 normalM = MorphMath.Cross(e1m,e2m);
             Vector3 transformed = BuildBasisMatrix(e1m, e2m, normalM).MultiplyVector(local);
-            if (transformed.sqrMagnitude < 1e-10f || !IsFinite(transformed))
+            if (MorphMath.SqrMagnitude(transformed) < 1e-10f || !IsFinite(transformed))
                 transformed = originalOffset;
-            if (transformed.sqrMagnitude < 1e-10f || !IsFinite(transformed))
+            if (MorphMath.SqrMagnitude(transformed) < 1e-10f || !IsFinite(transformed))
                 return BodyAnchorMiss(context);
 
-            target = p0m + transformed.normalized * distance;
+            target = MorphMath.Add(p0m,MorphMath.Multiply(MorphMath.Normalize(transformed),distance));
             if (!IsFinite(target)) return BodyAnchorMiss(context);
 
             context.ClothHits++;
@@ -2765,8 +2766,8 @@ namespace ALPregnancy
             float mul = multiplier;
             Vector3 p0 = mesh.Original[p0Index];
             Vector3 p0m = ScaleAnchorMove(mesh.Original[p0Index], mesh.Morphed[p0Index], mul);
-            Vector3 originalOffset = original - p0;
-            float distance = originalOffset.magnitude;
+            Vector3 originalOffset = MorphMath.Subtract(original,p0);
+            float distance = MorphMath.Magnitude(originalOffset);
 
             if (distance < 1e-7f)
             {
@@ -2778,16 +2779,16 @@ namespace ALPregnancy
             Vector3 local = basis.OriginalInverse.MultiplyVector(originalOffset);
             Vector3 n1m = ScaleAnchorMove(mesh.Original[basis.Neighbor1], mesh.Morphed[basis.Neighbor1], mul);
             Vector3 n2m = ScaleAnchorMove(mesh.Original[basis.Neighbor2], mesh.Morphed[basis.Neighbor2], mul);
-            Vector3 e1m = n1m - p0m;
-            Vector3 e2m = n2m - p0m;
-            Vector3 normalM = Vector3.Cross(e1m, e2m);
+            Vector3 e1m = MorphMath.Subtract(n1m,p0m);
+            Vector3 e2m = MorphMath.Subtract(n2m,p0m);
+            Vector3 normalM = MorphMath.Cross(e1m,e2m);
             Vector3 transformed = BuildBasisMatrix(e1m, e2m, normalM).MultiplyVector(local);
-            if (transformed.sqrMagnitude < 1e-10f || !IsFinite(transformed))
+            if (MorphMath.SqrMagnitude(transformed) < 1e-10f || !IsFinite(transformed))
                 transformed = originalOffset;
-            if (transformed.sqrMagnitude < 1e-10f || !IsFinite(transformed))
+            if (MorphMath.SqrMagnitude(transformed) < 1e-10f || !IsFinite(transformed))
                 return false;
 
-            target = p0m + transformed.normalized * distance;
+            target = MorphMath.Add(p0m,MorphMath.Multiply(MorphMath.Normalize(transformed),distance));
             if (!IsFinite(target)) return false;
             TryCreateBodyAnchorRotationDelta(mesh, basis, p0Index, mul, out rotationDelta);
             return true;
@@ -2805,10 +2806,10 @@ namespace ALPregnancy
             {
                 Vector3 p0 = mesh.Original[p0Index];
                 Vector3 p0m = ScaleAnchorMove(mesh.Original[p0Index], mesh.Morphed[p0Index], multiplier);
-                Vector3 e1 = mesh.Original[basis.Neighbor1] - p0;
-                Vector3 e2 = mesh.Original[basis.Neighbor2] - p0;
-                Vector3 e1m = ScaleAnchorMove(mesh.Original[basis.Neighbor1], mesh.Morphed[basis.Neighbor1], multiplier) - p0m;
-                Vector3 e2m = ScaleAnchorMove(mesh.Original[basis.Neighbor2], mesh.Morphed[basis.Neighbor2], multiplier) - p0m;
+                Vector3 e1 = MorphMath.Subtract(mesh.Original[basis.Neighbor1],p0);
+                Vector3 e2 = MorphMath.Subtract(mesh.Original[basis.Neighbor2],p0);
+                Vector3 e1m = MorphMath.Subtract(ScaleAnchorMove(mesh.Original[basis.Neighbor1], mesh.Morphed[basis.Neighbor1], multiplier),p0m);
+                Vector3 e2m = MorphMath.Subtract(ScaleAnchorMove(mesh.Original[basis.Neighbor2], mesh.Morphed[basis.Neighbor2], multiplier),p0m);
 
                 if (!TryBuildAnchorRotation(e1, e2, out Quaternion oldRot)) return false;
                 if (!TryBuildAnchorRotation(e1m, e2m, out Quaternion newRot)) return false;
@@ -2831,15 +2832,15 @@ namespace ALPregnancy
         {
             rotation = Quaternion.identity;
             Vector3 right = e1;
-            if (right.sqrMagnitude < 1e-10f) return false;
+            if (MorphMath.SqrMagnitude(right) < 1e-10f) return false;
             right.Normalize();
 
-            Vector3 normal = Vector3.Cross(e1, e2);
-            if (normal.sqrMagnitude < 1e-10f) return false;
+            Vector3 normal = MorphMath.Cross(e1,e2);
+            if (MorphMath.SqrMagnitude(normal) < 1e-10f) return false;
             normal.Normalize();
 
-            Vector3 up = Vector3.Cross(normal, right);
-            if (up.sqrMagnitude < 1e-10f) return false;
+            Vector3 up = MorphMath.Cross(normal,right);
+            if (MorphMath.SqrMagnitude(up) < 1e-10f) return false;
             up.Normalize();
 
             rotation = Quaternion.LookRotation(normal, up);
@@ -2867,7 +2868,7 @@ namespace ALPregnancy
             if (requireAffected && (mesh.Affected == null || !mesh.Affected[index]))
                 return false;
 
-            target = original + (mesh.Morphed[index] - mesh.Original[index]);
+            target = MorphMath.Add(original,(MorphMath.Subtract(mesh.Morphed[index],mesh.Original[index])));
             return IsFinite(target);
         }
 
@@ -2885,22 +2886,22 @@ namespace ALPregnancy
             }
 
             var p = BellyDeformSettings.Vtx;
-            float boneLen = Mathf.Max(fr.BoneLen, 1e-5f);
+            float boneLen = MorphMath.Max(fr.BoneLen,1e-5f);
             float threshold = p.ClothDistortThreshold;
-            Vector3 baseDisp = baseTarget - original;
-            Vector3 anchorDisp = anchorTarget - original;
-            float baseMag = baseDisp.magnitude;
-            float anchorMag = anchorDisp.magnitude;
-            float delta = (anchorTarget - baseTarget).magnitude;
+            Vector3 baseDisp = MorphMath.Subtract(baseTarget,original);
+            Vector3 anchorDisp = MorphMath.Subtract(anchorTarget,original);
+            float baseMag = MorphMath.Magnitude(baseDisp);
+            float anchorMag = MorphMath.Magnitude(anchorDisp);
+            float delta = MorphMath.Magnitude((MorphMath.Subtract(anchorTarget,baseTarget)));
 
-            float maxDelta = Mathf.Max(baseMag * 0.90f, boneLen * threshold * 0.65f);
+            float maxDelta = MorphMath.Max(baseMag * 0.90f,boneLen * threshold * 0.65f);
             if (delta > maxDelta)
             {
                 if (context != null) context.ClothRejected++;
                 return false;
             }
 
-            float maxMag = Mathf.Max(baseMag * 2.25f, baseMag + boneLen * threshold);
+            float maxMag = MorphMath.Max(baseMag * 2.25f,baseMag + boneLen * threshold);
             if (anchorMag > maxMag)
             {
                 if (context != null) context.ClothRejected++;
@@ -2909,7 +2910,7 @@ namespace ALPregnancy
 
             if (baseMag > boneLen * 0.05f && anchorMag > boneLen * 0.05f)
             {
-                float dir = Vector3.Dot(baseDisp / baseMag, anchorDisp / anchorMag);
+                float dir = MorphMath.Dot(MorphMath.Divide(baseDisp,baseMag),MorphMath.Divide(anchorDisp,anchorMag));
                 if (dir < -0.25f)
                 {
                     if (context != null) context.ClothRejected++;
@@ -2928,7 +2929,7 @@ namespace ALPregnancy
 
         private static Vector3 ScaleAnchorMove(Vector3 original, Vector3 morphed, float multiplier)
         {
-            return original + (morphed - original) * multiplier;
+            return MorphMath.Add(original,MorphMath.Multiply((MorphMath.Subtract(morphed,original)),multiplier));
         }
 
         private static bool IsValidBodyAnchorVertex(BodyAnchorMesh mesh, int index)
@@ -2955,6 +2956,15 @@ namespace ALPregnancy
             bool found = false;
             float bestSq = float.MaxValue;
 
+            bool indexed = context.Search != null && IsFinite(point);
+            int global = indexed ? context.Search.Nearest(point, requireAffected, bx, by, bz) : -1;
+            if (indexed && global < 0) return false;
+            if (indexed && context.Search.BucketRank(global, bx, by, bz) != int.MaxValue)
+            {
+                nearest = context.Points[global];
+                return true;
+            }
+
             for (int dx = -3; dx <= 3; dx++)
                 for (int dy = -3; dy <= 3; dy++)
                     for (int dz = -3; dz <= 3; dz++)
@@ -2967,6 +2977,7 @@ namespace ALPregnancy
 
             if (found) return true;
 
+            if (indexed) { nearest = context.Points[global]; return true; }
             for (int i = 0; i < context.Points.Count; i++)
                 TestBodyAnchorPoint(context, point, i, requireAffected, ref found, ref bestSq, ref nearest);
             return found;
@@ -2991,7 +3002,7 @@ namespace ALPregnancy
                 if (!mesh.Affected[candidate.VertexIndex]) return;
             }
 
-            float sq = (candidate.Original - point).sqrMagnitude;
+            float sq = MorphMath.SqrMagnitude((MorphMath.Subtract(candidate.Original,point)));
             if (sq >= bestSq) return;
 
             found = true;
@@ -3070,10 +3081,10 @@ namespace ALPregnancy
 
         private static void BodyAnchorBucketCoords(Vector3 point, float cellSize, out int x, out int y, out int z)
         {
-            float cell = Mathf.Max(cellSize, 0.0001f);
-            x = Mathf.FloorToInt(point.x / cell);
-            y = Mathf.FloorToInt(point.y / cell);
-            z = Mathf.FloorToInt(point.z / cell);
+            float cell = MorphMath.Max(cellSize,0.0001f);
+            x = MorphMath.FloorToInt(point.x / cell);
+            y = MorphMath.FloorToInt(point.y / cell);
+            z = MorphMath.FloorToInt(point.z / cell);
         }
 
         private static int BodyAnchorBucketKey(int x, int y, int z)
@@ -3121,23 +3132,23 @@ namespace ALPregnancy
                 if (morphed.Length != count || moved.Length != count) return 0;
                 if (topologyNeighbors == null || topologyNeighbors.Length != count) return 0;
 
-                float boneLen = Mathf.Max(fr.BoneLen, 1e-5f);
+                float boneLen = MorphMath.Max(fr.BoneLen,1e-5f);
                 float minMoveSq = boneLen * boneLen * 1e-8f;
                 var movedIndices = new List<int>();
 
                 for (int i = 0; i < count; i++)
                 {
                     if (!moved[i]) continue;
-                    Vector3 disp = morphed[i] - original[i];
-                    if (disp.sqrMagnitude <= minMoveSq) continue;
+                    Vector3 disp = MorphMath.Subtract(morphed[i],original[i]);
+                    if (MorphMath.SqrMagnitude(disp) <= minMoveSq) continue;
 
                     movedIndices.Add(i);
                 }
 
                 if (movedIndices.Count < 3) return 0;
-                float radius = Mathf.Max(boneLen * 1.50f, 0.012f);
+                float radius = MorphMath.Max(boneLen * 1.50f,0.012f);
                 float radiusSq = radius * radius;
-                float cell = Mathf.Max(radius, 0.001f);
+                float cell = MorphMath.Max(radius,0.001f);
                 var buckets = BuildSpatialBuckets(original, movedIndices, cell);
                 if (buckets.Count == 0) return 0;
 
@@ -3161,8 +3172,8 @@ namespace ALPregnancy
                         continue;
                     }
 
-                    Vector3 dispI = morphed[i] - original[i];
-                    Vector3 topoSum = Vector3.zero;
+                    Vector3 dispI = MorphMath.Subtract(morphed[i],original[i]);
+                    Vector3 topoSum = MorphMath.V(0,0,0);
                     int topoSamples = 0;
                     int tornEdges = 0;
                     float localMaxEdgeDiffNorm = 0f;
@@ -3171,16 +3182,16 @@ namespace ALPregnancy
                     {
                         int j = topo[t];
                         if (j == i || j < 0 || j >= count || !moved[j]) continue;
-                        Vector3 dispJ = morphed[j] - original[j];
-                        if (dispJ.sqrMagnitude <= minMoveSq) continue;
+                        Vector3 dispJ = MorphMath.Subtract(morphed[j],original[j]);
+                        if (MorphMath.SqrMagnitude(dispJ) <= minMoveSq) continue;
 
-                        float edgeDiffNorm = (dispI - dispJ).magnitude / boneLen;
+                        float edgeDiffNorm = MorphMath.Magnitude((MorphMath.Subtract(dispI,dispJ))) / boneLen;
                         if (edgeDiffNorm > localMaxEdgeDiffNorm)
                             localMaxEdgeDiffNorm = edgeDiffNorm;
                         if (edgeDiffNorm >= detectThreshold)
                             tornEdges++;
 
-                        topoSum += dispJ;
+                        topoSum =MorphMath.Add(topoSum,dispJ);
                         topoSamples++;
                     }
 
@@ -3207,9 +3218,9 @@ namespace ALPregnancy
                         int j = neighbors[n];
                         if (j == i || !moved[j]) continue;
 
-                        Vector3 dispJ = morphed[j] - original[j];
-                        if (dispJ.sqrMagnitude <= minMoveSq) continue;
-                        localSum += dispJ;
+                        Vector3 dispJ = MorphMath.Subtract(morphed[j],original[j]);
+                        if (MorphMath.SqrMagnitude(dispJ) <= minMoveSq) continue;
+                        localSum =MorphMath.Add(localSum,dispJ);
                         localSamples++;
                     }
 
@@ -3219,28 +3230,28 @@ namespace ALPregnancy
                         continue;
                     }
 
-                    Vector3 localAvg = localSum / localSamples;
-                    float diffNorm = (dispI - localAvg).magnitude / boneLen;
+                    Vector3 localAvg = MorphMath.Divide(localSum,localSamples);
+                    float diffNorm = MorphMath.Magnitude((MorphMath.Subtract(dispI,localAvg))) / boneLen;
                     if (diffNorm > maxDiffNorm)
                         maxDiffNorm = diffNorm;
                     checkedCount++;
 
                     if (diffNorm < detectThreshold) continue;
 
-                    Vector3 sum = Vector3.zero;
+                    Vector3 sum = MorphMath.V(0,0,0);
                     int samples = 0;
                     for (int t = 0; t < topo.Count; t++)
                     {
                         int k = topo[t];
                         if (k == i || k < 0 || k >= count || !moved[k]) continue;
 
-                        Vector3 kDisp = morphed[k] - original[k];
-                        if (kDisp.sqrMagnitude <= minMoveSq) continue;
+                        Vector3 kDisp = MorphMath.Subtract(morphed[k],original[k]);
+                        if (MorphMath.SqrMagnitude(kDisp) <= minMoveSq) continue;
 
-                        float sampleDiff = (kDisp - localAvg).magnitude / boneLen;
+                        float sampleDiff = MorphMath.Magnitude((MorphMath.Subtract(kDisp,localAvg))) / boneLen;
                         if (sampleDiff <= normalNeighborDiff || sampleDiff < diffNorm * 0.50f)
                         {
-                            sum += kDisp;
+                            sum =MorphMath.Add(sum,kDisp);
                             samples++;
                         }
                     }
@@ -3252,13 +3263,13 @@ namespace ALPregnancy
                             int k = neighbors[n];
                             if (k == i || !moved[k]) continue;
 
-                            Vector3 kDisp = morphed[k] - original[k];
-                            if (kDisp.sqrMagnitude <= minMoveSq) continue;
+                            Vector3 kDisp = MorphMath.Subtract(morphed[k],original[k]);
+                            if (MorphMath.SqrMagnitude(kDisp) <= minMoveSq) continue;
 
-                            float sampleDiff = (kDisp - localAvg).magnitude / boneLen;
+                            float sampleDiff = MorphMath.Magnitude((MorphMath.Subtract(kDisp,localAvg))) / boneLen;
                             if (sampleDiff <= normalNeighborDiff || sampleDiff < diffNorm * 0.50f)
                             {
-                                sum += kDisp;
+                                sum =MorphMath.Add(sum,kDisp);
                                 samples++;
                             }
                         }
@@ -3267,17 +3278,17 @@ namespace ALPregnancy
                     Vector3 replacementDisp;
                     if (samples > 0)
                     {
-                        replacementDisp = sum / samples;
+                        replacementDisp = MorphMath.Divide(sum,samples);
                     }
                     else
                     {
                         noSampleCount++;
                         if (tornEdges < 2 || localMaxEdgeDiffNorm < detectThreshold * 2f)
                             continue;
-                        replacementDisp = topoSum / topoSamples;
+                        replacementDisp = MorphMath.Divide(topoSum,topoSamples);
                     }
 
-                    replacement[i] = original[i] + replacementDisp;
+                    replacement[i] = MorphMath.Add(original[i],replacementDisp);
                     shouldReplace[i] = true;
                     fixedCount++;
                 }
@@ -3331,7 +3342,7 @@ namespace ALPregnancy
 
             Vector3 center = points[centerIndex];
             SpatialBucketCoords(center, cellSize, out int bx, out int by, out int bz);
-            int range = Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(radiusSq) / Mathf.Max(cellSize, 1e-5f)));
+            int range = MorphMath.Max(1,MorphMath.CeilToInt(MorphMath.Sqrt(radiusSq) / MorphMath.Max(cellSize,1e-5f)));
 
             for (int dx = -range; dx <= range; dx++)
                 for (int dy = -range; dy <= range; dy++)
@@ -3344,7 +3355,7 @@ namespace ALPregnancy
                             int candidate = list[i];
                             if (candidate == centerIndex) continue;
                             if (candidate < 0 || candidate >= points.Length) continue;
-                            if ((points[candidate] - center).sqrMagnitude <= radiusSq)
+                            if (MorphMath.SqrMagnitude((MorphMath.Subtract(points[candidate],center))) <= radiusSq)
                                 result.Add(candidate);
                         }
                     }
@@ -3352,10 +3363,10 @@ namespace ALPregnancy
 
         private static void SpatialBucketCoords(Vector3 point, float cellSize, out int x, out int y, out int z)
         {
-            float cell = Mathf.Max(cellSize, 0.0001f);
-            x = Mathf.FloorToInt(point.x / cell);
-            y = Mathf.FloorToInt(point.y / cell);
-            z = Mathf.FloorToInt(point.z / cell);
+            float cell = MorphMath.Max(cellSize,0.0001f);
+            x = MorphMath.FloorToInt(point.x / cell);
+            y = MorphMath.FloorToInt(point.y / cell);
+            z = MorphMath.FloorToInt(point.z / cell);
         }
 
         private static int SpatialBucketKey(int x, int y, int z)
@@ -3589,7 +3600,7 @@ namespace ALPregnancy
                 int best = 0;
                 for (int j = 0; j < bn; j++)
                 {
-                    float dSq = (bodyVerts[j] - op).sqrMagnitude;
+                    float dSq = MorphMath.SqrMagnitude((MorphMath.Subtract(bodyVerts[j],op)));
                     if (dSq < bestSq) { bestSq = dSq; best = j; }
                 }
                 cache[i] = best;
@@ -3625,9 +3636,9 @@ namespace ALPregnancy
             for (int i = 0; i < n; i++)
             {
                 Vector3 v = verts[i];
-                var key = (Mathf.RoundToInt(v.x * invEps),
-                           Mathf.RoundToInt(v.y * invEps),
-                           Mathf.RoundToInt(v.z * invEps));
+                var key = (MorphMath.RoundToInt(v.x * invEps),
+                           MorphMath.RoundToInt(v.y * invEps),
+                           MorphMath.RoundToInt(v.z * invEps));
                 if (!map.TryGetValue(key, out int rep))
                 {
                     rep = i;
@@ -3656,17 +3667,17 @@ namespace ALPregnancy
                 {
                     int a = tris[i], b = tris[i + 1], c = tris[i + 2];
                     if ((uint)a >= (uint)n || (uint)b >= (uint)n || (uint)c >= (uint)n) continue;
-                    Vector3 cross = Vector3.Cross(verts[b] - verts[a], verts[c] - verts[a]);
-                    if (cross.sqrMagnitude < 1e-20f) continue;
-                    accum[weldGroup[a]] += cross;
-                    accum[weldGroup[b]] += cross;
-                    accum[weldGroup[c]] += cross;
+                    Vector3 cross = MorphMath.Cross(MorphMath.Subtract(verts[b],verts[a]),MorphMath.Subtract(verts[c],verts[a]));
+                    if (MorphMath.SqrMagnitude(cross) < 1e-20f) continue;
+                    accum[weldGroup[a]] =MorphMath.Add(accum[weldGroup[a]],cross);
+                    accum[weldGroup[b]] =MorphMath.Add(accum[weldGroup[b]],cross);
+                    accum[weldGroup[c]] =MorphMath.Add(accum[weldGroup[c]],cross);
                 }
                 var normals = new Vector3[n];
                 for (int i = 0; i < n; i++)
                 {
                     Vector3 s = accum[weldGroup[i]];
-                    normals[i] = s.sqrMagnitude > 1e-20f ? s.normalized : Vector3.up;
+                    normals[i] = MorphMath.SqrMagnitude(s) > 1e-20f ? MorphMath.Normalize(s) : MorphMath.V(0,1,0);
                 }
                 return normals;
             }
@@ -3691,17 +3702,17 @@ namespace ALPregnancy
                 {
                     int a = tris[i], b = tris[i + 1], c = tris[i + 2];
                     if ((uint)a >= (uint)n || (uint)b >= (uint)n || (uint)c >= (uint)n) continue;
-                    Vector3 cross = Vector3.Cross(verts[b] - verts[a], verts[c] - verts[a]);
-                    if (cross.sqrMagnitude < 1e-20f) continue;
-                    accum[weldGroup[a]] += cross;
-                    accum[weldGroup[b]] += cross;
-                    accum[weldGroup[c]] += cross;
+                    Vector3 cross = MorphMath.Cross(MorphMath.Subtract(verts[b],verts[a]),MorphMath.Subtract(verts[c],verts[a]));
+                    if (MorphMath.SqrMagnitude(cross) < 1e-20f) continue;
+                    accum[weldGroup[a]] =MorphMath.Add(accum[weldGroup[a]],cross);
+                    accum[weldGroup[b]] =MorphMath.Add(accum[weldGroup[b]],cross);
+                    accum[weldGroup[c]] =MorphMath.Add(accum[weldGroup[c]],cross);
                 }
                 var normals = new Vector3[n];
                 for (int i = 0; i < n; i++)
                 {
                     Vector3 s = accum[weldGroup[i]];
-                    normals[i] = s.sqrMagnitude > 1e-20f ? s.normalized : Vector3.up;
+                    normals[i] = MorphMath.SqrMagnitude(s) > 1e-20f ? MorphMath.Normalize(s) : MorphMath.V(0,1,0);
                 }
                 mesh.normals = normals;
             }
@@ -3747,7 +3758,7 @@ namespace ALPregnancy
                     movedReps = new HashSet<int>();
                     for (int i = 0; i < n; i++)
                     {
-                        Vector3 d = newVerts[i] - origVerts[i];
+                        Vector3 d = MorphMath.Subtract(newVerts[i],origVerts[i]);
                         if (d.x * d.x + d.y * d.y + d.z * d.z > 1e-10f)
                             movedReps.Add(weldGroup[i]);
                     }
@@ -3760,7 +3771,7 @@ namespace ALPregnancy
                 for (int i = 0; i < n; i++)
                 {
                     // Keep welded normals for verts that actually moved.
-                    Vector3 d = newVerts[i] - origVerts[i];
+                    Vector3 d = MorphMath.Subtract(newVerts[i],origVerts[i]);
                     if (d.x * d.x + d.y * d.y + d.z * d.z > 1e-10f) continue;
                     // Keep welded normals for unmoved verts in a seam group with a moved vert.
                     if (hasWG && movedReps != null && movedReps.Contains(weldGroup[i])) continue;

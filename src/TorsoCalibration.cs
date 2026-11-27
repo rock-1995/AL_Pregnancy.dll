@@ -23,8 +23,8 @@ internal static partial class BellyVertexMorph
             if(smr!=state.SMR && !TryComputeClothBodyMatrix(smr,state.SMR,out map,out _)) continue;
             System.Numerics.Vector3 Local(Vector3 v)
             {
-                var d=map.MultiplyPoint3x4(v)-frame.Center;
-                return new System.Numerics.Vector3(Vector3.Dot(d,frame.Right),Vector3.Dot(d,frame.Up),Vector3.Dot(d,frame.Fwd));
+                var d=MorphMath.Subtract(MorphMath.MultiplyPoint3x4(map,v),frame.Center);
+                return new System.Numerics.Vector3(MorphMath.Dot(d,frame.Right),MorphMath.Dot(d,frame.Up),MorphMath.Dot(d,frame.Fwd));
             }
             Transform[] rig=smr.bones;
             Matrix4x4[] bind=smr.sharedMesh.bindposes;
@@ -34,7 +34,7 @@ internal static partial class BellyVertexMorph
                     var pose=MatrixBridge.ToManaged(bind[i]);
                     if(!System.Numerics.Matrix4x4.Invert(pose,out var inverse)) continue;
                     var p=inverse.Translation;
-                    bones.Add(rig[i].name,Local(new Vector3(p.X,p.Y,p.Z)));
+                    bones.Add(rig[i].name,Local(MorphMath.V(p.X,p.Y,p.Z)));
                 }
             // Called once before the first deformation in this lease.
             Vector3[] vertices=smr.sharedMesh.vertices;

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.7
+
+- Update the skirt's virtual bones after MagicaCloth finishes its current-frame physics work. The skirt hem follows cloth motion while the pregnancy shape is active.
+- Includes the 0.3.6 skirt support changes. The isolated Unity test checked 120 frames against the current-frame native pose.
+
 ## 0.3.5
 
 - Give the native character-editor pregnancy controls the game's blue panel background and standard two-line slider layout. Keep both rows at the native height with consistent spacing to prevent overlapping labels.
