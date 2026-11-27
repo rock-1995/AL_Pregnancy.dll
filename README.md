@@ -1,6 +1,7 @@
 # AL Pregnancy
 
-**Version 0.3.7** — a BepInEx IL2CPP pregnancy plugin for **AmanatsuLocation**.
+**Version 0.3.7** — a pregnancy plugin for **AmanatsuLocation**. Requires BepInEx
+6 IL2CPP. Configuration Manager and AL Uncensor are optional.
 
 Pregnancy progresses with game days and drives a growing belly, clothing deformation, pose response, and optional body changes based on childbirth history. Use **F1** for global settings through a compatible configuration manager and **F8** for character state and manual shape preview.
 
